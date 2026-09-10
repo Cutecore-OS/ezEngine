@@ -1,0 +1,7 @@
+ez_cmake_init()
+ez_requires(EZ_BUILD_UNITTESTS)
+ez_requires_renderer()
+ez_create_target(APPLICATION DirectionalTargetIndicatorPluginTest)
+target_link_libraries(DirectionalTargetIndicatorPluginTest PUBLIC TestFramework DirectionalTargetIndicatorPlugin)
+ez_add_renderers(DirectionalTargetIndicatorPluginTest)
+ez_ci_add_test(DirectionalTargetIndicatorPluginTest NEEDS_HW_ACCESS)

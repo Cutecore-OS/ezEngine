@@ -1,0 +1,15 @@
+PluginInfo
+{
+  string %DisplayName{"Grey Boxing Tools"}
+  string %Description{"Grey Boxing pivot recalculation, anchor picking and vertex snapping. Editor-only tools."}
+  string %EditorPlugins{"ezEditorPluginGreyBox"}
+  string %EditorEnginePlugins{}
+  string %RuntimePlugins{}
+  string %PackageDependencies{}
+  string %RequiredPlugins{"Scene"}
+  string %ExclusiveFeatures{}
+  string %EnabledInTemplates{}
+}
+
+
+

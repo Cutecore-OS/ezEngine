@@ -1,0 +1,7 @@
+ez_cmake_init()
+ez_requires(EZ_BUILD_UNITTESTS)
+ez_requires_renderer()
+ez_create_target(APPLICATION SkyBillboardPluginTest)
+target_link_libraries(SkyBillboardPluginTest PUBLIC TestFramework SkyBillboardPlugin)
+ez_add_renderers(SkyBillboardPluginTest)
+ez_ci_add_test(SkyBillboardPluginTest NEEDS_HW_ACCESS)

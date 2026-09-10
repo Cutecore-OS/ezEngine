@@ -1,7 +1,8 @@
 #pragma once
 
 #include <Core/ResourceManager/Resource.h>
-#include <MiniAudioPlugin/MiniAudioPluginDLL.h>
+#include <Foundation/Threading/Mutex.h>
+#include <MiniAudioPlugin/Effects/MiniAudioEffect.h>
 
 class ezRandom;
 class ezWorld;
@@ -10,7 +11,8 @@ struct ezComponentHandle;
 
 using ezMiniAudioSoundResourceHandle = ezTypedResourceHandle<class ezMiniAudioSoundResource>;
 
-struct EZ_MINIAUDIOPLUGIN_DLL ezMiniAudioSoundResourceDescriptor{
+struct EZ_MINIAUDIOPLUGIN_DLL ezMiniAudioSoundResourceDescriptor
+{
   // empty, these types of resources must be loaded from file
 };
 
@@ -26,6 +28,10 @@ public:
 
   const ezDataBuffer& GetAudioData() const;
   const ezDataBuffer& GetAudioData(ezRandom& ref_rng) const;
+
+  const ezDynamicArray<ezMiniAudioEffect>& GetEffects() const { return m_Effects; }
+  ezStringView GetGroup() const { return m_sSoundGroup; }
+  ezUInt32 SelectVariation(ezRandom& rng) const;
 
   bool GetLoop() const { return m_bLoop; }
   float GetVolume(ezRandom& ref_rng) const;
@@ -47,6 +53,11 @@ private:
 private:
   ezHybridArray<ezDataBuffer, 1> m_AudioData;
 
+  ezDynamicArray<ezMiniAudioEffect> m_Effects;
+  bool m_bRandomWithoutRepeats = false;
+  mutable ezMutex m_VariationMutex;
+  mutable ezDynamicArray<ezUInt32> m_ShuffleBag;
+  mutable ezUInt32 m_uiLastVariation = ezInvalidIndex;
   ezString m_sSoundGroup;
   bool m_bLoop = false;
   float m_fMinVolume = 1.0f;
