@@ -1,0 +1,313 @@
+[PLATFORMS]
+ALL
+
+[PERMUTATIONS]
+
+BLEND_MODE
+RENDER_PASS
+SHADING_MODE
+TWO_SIDED
+FLIP_WINDING
+FORWARD_PASS_WRITE_DEPTH
+MSAA
+CAMERA_MODE
+SHADING_QUALITY
+VERTEX_SKINNING
+MATERIAL_PREVIEW
+
+[MATERIALPARAMETER]
+
+Permutation BLEND_MODE;
+Permutation SHADING_MODE;
+Permutation TWO_SIDED;
+
+Color BaseColor @Default(Color(1.0, 1.0, 1.0));
+bool UseBaseTexture;
+Texture2D BaseTexture;
+
+float MaskThreshold @Default(0.25);
+Texture2D DitherNoiseTexture @Default("{ ac614d7c-2b31-4a7b-aa0c-c5d8200b7b89 }");
+
+bool UseNormalTexture;
+Texture2D NormalTexture;
+
+bool UseOcclusionTexture;
+Texture2D OcclusionTexture;
+
+float RoughnessValue @Default(0.7) @Clamp(0.0, 1.0);
+bool UseRoughnessTexture;
+Texture2D RoughnessTexture;
+
+float MetallicValue @Default(0.0) @Clamp(0.0, 1.0);
+bool UseMetallicTexture;
+Texture2D MetallicTexture;
+
+bool UseOrmTexture;
+Texture2D OrmTexture;
+
+Color EmissiveColor @Default(Color(0.0, 0.0, 0.0));
+bool UseEmissiveTexture;
+Texture2D EmissiveTexture;
+
+bool UseHeightTexture;
+Texture2D HeightTexture;
+float HeightScale @Default(0.05) @Clamp(-0.3, 0.3);
+int PomMaxSteps @Default(16) @Clamp(4, 64);
+
+[MATERIALCONFIG]
+
+#include <Shaders/Materials/MaterialConfig.h>
+
+[RENDERSTATE]
+
+#include <Shaders/Materials/MaterialState.h>
+
+[MATERIALCONSTANTS]
+
+COLOR4F(BaseColor);
+COLOR4F(EmissiveColor);
+FLOAT1(MetallicValue);
+FLOAT1(RoughnessValue);
+FLOAT1(MaskThreshold);
+BOOL1(UseBaseTexture);
+BOOL1(UseNormalTexture);
+BOOL1(UseRoughnessTexture);
+BOOL1(UseMetallicTexture);
+BOOL1(UseEmissiveTexture);
+BOOL1(UseOcclusionTexture);
+BOOL1(UseOrmTexture);
+BOOL1(UseHeightTexture);
+FLOAT1(HeightScale);
+INT1(PomMaxSteps);
+
+[VERTEXSHADER]
+
+#define USE_WORLD_POSITION_OFFSET
+
+#define USE_NORMAL
+#define USE_TANGENT
+#define USE_TEXCOORD0
+
+#if VERTEX_SKINNING
+  #define USE_SKINNING
+#endif
+
+#if RENDER_PASS == RENDER_PASS_EDITOR
+  #define USE_DEBUG_INTERPOLATOR
+#endif
+
+#include <Shaders/Materials/MaterialVertexShader.h>
+
+// Grass patches store row count in CustomData.x. Ordinary meshes need no extra vertex streams.
+float3 GetWorldPositionOffset(ezPerInstanceData data, float3 worldPosition)
+{
+#if MATERIAL_PREVIEW
+  return 0;
+#else
+  if (IsShadowPass || data.CustomData.w != 1731.0) return 0;
+  float3 normal = normalize(mul(TransformToRotation(data.ObjectToWorldNormal), G.Input.Normal * 2.0 - 1.0));
+  float3 up = GetCameraDirUp();
+  float4x4 objectToWorld = TransformToMatrix(data.ObjectToWorld);
+  float scale = max(length(objectToWorld._m00_m10_m20), max(length(objectToWorld._m01_m11_m21), length(objectToWorld._m02_m12_m22)));
+  uint rows = max(2u, (uint)data.CustomData.x);
+  float height = float((G.Input.VertexID % (rows * 2u)) / 2u) / float(rows - 1u);
+  return up * (1 - saturate(dot(normal, up))) * 0.8 * height * scale * data.CustomData.y;
+#endif
+}
+
+VS_OUT main(VS_IN Input)
+{
+  return FillVertexData(Input);
+}
+
+[PIXELSHADER]
+
+#define USE_NORMAL
+#define USE_TANGENT
+#define USE_TEXCOORD0
+#define USE_SIMPLE_MATERIAL_MODEL
+#define USE_MATERIAL_EMISSIVE
+#define USE_MATERIAL_OCCLUSION
+#define USE_TWO_SIDED_LIGHTING
+#define USE_DECALS
+#define USE_FOG
+#define USE_CUSTOM_DITHER_NOISE
+#define CUSTOM_GLOBALS float2 ParallaxTexCoord;
+
+#if RENDER_PASS == RENDER_PASS_EDITOR
+  #define USE_DEBUG_INTERPOLATOR
+#endif
+
+#include <Shaders/Materials/MaterialPixelShader.h>
+
+Texture2D BaseTexture BIND_GROUP(BG_MATERIAL);
+SamplerState BaseTexture_AutoSampler BIND_GROUP(BG_MATERIAL);
+
+Texture2D NormalTexture BIND_GROUP(BG_MATERIAL);
+SamplerState NormalTexture_AutoSampler BIND_GROUP(BG_MATERIAL);
+
+Texture2D MetallicTexture BIND_GROUP(BG_MATERIAL);
+SamplerState MetallicTexture_AutoSampler BIND_GROUP(BG_MATERIAL);
+
+Texture2D RoughnessTexture BIND_GROUP(BG_MATERIAL);
+SamplerState RoughnessTexture_AutoSampler BIND_GROUP(BG_MATERIAL);
+
+Texture2D EmissiveTexture BIND_GROUP(BG_MATERIAL);
+SamplerState EmissiveTexture_AutoSampler BIND_GROUP(BG_MATERIAL);
+
+Texture2D OcclusionTexture BIND_GROUP(BG_MATERIAL);
+SamplerState OcclusionTexture_AutoSampler BIND_GROUP(BG_MATERIAL);
+
+Texture2D OrmTexture BIND_GROUP(BG_MATERIAL);
+SamplerState OrmTexture_AutoSampler BIND_GROUP(BG_MATERIAL);
+
+Texture2D DitherNoiseTexture BIND_GROUP(BG_MATERIAL);
+
+Texture2D HeightTexture BIND_GROUP(BG_MATERIAL);
+SamplerState HeightTexture_AutoSampler BIND_GROUP(BG_MATERIAL);
+
+#include <Shaders/Common/ParallaxMapping.h>
+
+void FillCustomGlobals()
+{
+  G.ParallaxTexCoord = G.Input.TexCoord0.xy;
+
+  [branch]
+  if (GetMaterialData(UseHeightTexture))
+  {
+    float3 viewDirWS = normalize(GetCameraPosition() - G.Input.WorldPosition);
+    float3 viewDirTS = WorldToTangentSpace(viewDirWS);
+
+    G.ParallaxTexCoord = ParallaxOcclusionMapping(
+      HeightTexture, HeightTexture_AutoSampler,
+      G.Input.TexCoord0.xy, viewDirTS,
+      GetMaterialData(HeightScale), GetMaterialData(PomMaxSteps));
+  }
+}
+
+float3 GetNormal()
+{
+  [branch]
+  if (GetMaterialData(UseNormalTexture))
+  {
+    float3 normalTS = DecodeNormalTexture(NormalTexture.Sample(NormalTexture_AutoSampler, G.ParallaxTexCoord));
+    return TangentToWorldSpace(normalTS);
+  }
+  else
+  {
+    return G.Input.Normal;
+  }
+}
+
+float3 GetBaseColor()
+{
+  float3 baseColor = GetMaterialData(BaseColor).rgb * GetInstanceData().Color.rgb;
+
+  // note that the default material actually doesn't support per-vertex colors
+#if defined(USE_COLOR0)
+  baseColor *= G.Input.Color0;
+#endif
+
+  [branch]
+  if (GetMaterialData(UseBaseTexture))
+  {
+    baseColor *= BaseTexture.Sample(BaseTexture_AutoSampler, G.ParallaxTexCoord).rgb;
+  }
+
+  return baseColor;
+}
+
+float GetMetallic()
+{
+  [branch]
+  if (GetMaterialData(UseOrmTexture))
+  {
+    return OrmTexture.Sample(OrmTexture_AutoSampler, G.ParallaxTexCoord).b;
+  }
+  else if (GetMaterialData(UseMetallicTexture))
+  {
+    return MetallicTexture.Sample(MetallicTexture_AutoSampler, G.ParallaxTexCoord).r;
+  }
+  else
+  {
+    return GetMaterialData(MetallicValue);
+  }
+}
+
+float GetReflectance()
+{
+  return 0.5f;
+}
+
+float GetRoughness()
+{
+  [branch]
+  if (GetMaterialData(UseOrmTexture))
+  {
+    return GetMaterialData(RoughnessValue) * OrmTexture.Sample(OrmTexture_AutoSampler, G.ParallaxTexCoord).g;
+  }
+  else if (GetMaterialData(UseRoughnessTexture))
+  {
+    return GetMaterialData(RoughnessValue) * RoughnessTexture.Sample(RoughnessTexture_AutoSampler, G.ParallaxTexCoord).r;
+  }
+  else
+  {
+    return GetMaterialData(RoughnessValue);
+  }
+}
+
+float GetOpacity()
+{
+
+  float opacity = GetMaterialData(BaseColor).a * GetInstanceData().Color.a;
+
+  [branch]
+  if (GetMaterialData(UseBaseTexture))
+  {
+    opacity *= BaseTexture.Sample(BaseTexture_AutoSampler, G.ParallaxTexCoord).a;
+  }
+
+  #if BLEND_MODE == BLEND_MODE_MASKED
+    return opacity - GetMaterialData(MaskThreshold);
+  #else
+    return opacity;
+  #endif
+}
+
+float3 GetEmissiveColor()
+{
+  [branch]
+  if (GetMaterialData(UseEmissiveTexture))
+  {
+    return EmissiveTexture.Sample(EmissiveTexture_AutoSampler, G.ParallaxTexCoord).rgb * GetMaterialData(EmissiveColor).rgb;
+  }
+  else
+  {
+    return GetMaterialData(EmissiveColor).rgb;
+  }
+}
+
+float GetOcclusion()
+{
+  [branch]
+  if (GetMaterialData(UseOrmTexture))
+  {
+    return OrmTexture.Sample(OrmTexture_AutoSampler, G.ParallaxTexCoord).r;
+  }
+  else if (GetMaterialData(UseOcclusionTexture))
+  {
+    return OcclusionTexture.Sample(OcclusionTexture_AutoSampler, G.ParallaxTexCoord).r;
+  }
+  else
+  {
+    return 1.0f;
+  }
+}
+
+float4 GetDitherNoise(float2 pixelCoord)
+{
+  uint2 noiseTextureSize;
+  DitherNoiseTexture.GetDimensions(noiseTextureSize.x, noiseTextureSize.y);
+
+  return DitherNoiseTexture.SampleLevel(PointSampler, pixelCoord / noiseTextureSize, 0);
+}

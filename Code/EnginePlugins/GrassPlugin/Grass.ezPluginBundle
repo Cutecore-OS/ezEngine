@@ -1,0 +1,8 @@
+PluginInfo
+{
+  string %DisplayName{"Grass"}
+  string %Description{"Mesh surface grass with segmented strands, wind and character interaction."}
+  string %RuntimePlugins{"ezGrassPlugin"}
+  string %DataDirectories{">sdk/Data/Plugins/GrassPlugin"}
+  string %CMakeTargetName{"GrassPlugin"}
+}
