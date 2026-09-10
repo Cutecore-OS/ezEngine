@@ -1,0 +1,8 @@
+PluginInfo
+{
+  string %DisplayName{"Sky Billboard"}
+  string %Description{"Texture billboards and transparent cubemap layers on the sky."}
+  string %RuntimePlugins{"ezSkyBillboardPlugin"}
+  string %DataDirectories{">sdk/Data/Plugins/SkyBillboardPlugin"}
+  string %CMakeTargetName{"SkyBillboardPlugin"}
+}

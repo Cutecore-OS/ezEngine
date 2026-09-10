@@ -1,0 +1,105 @@
+[PLATFORMS]
+ALL
+
+[PERMUTATIONS]
+CAMERA_MODE
+
+[MATERIALPARAMETER]
+Texture2D SkyTexture;
+TextureCube SkyCubeMap;
+Color Color @Default(Color(1.0, 1.0, 1.0));
+Color GlowColor @Default(Color(1.0, 1.0, 1.0));
+float HalfSize @Default(0.08748866);
+float AspectRatio @Default(1.0);
+float GlowIntensity;
+float Opacity @Default(1.0);
+bool UseCubeMap;
+bool Additive;
+
+[RENDERSTATE]
+CullMode = CullMode_None
+DepthTest = true
+DepthTestFunc = CompareFunc_LessEqual
+DepthWrite = false
+BlendingEnabled0 = true
+BlendOp0 = BlendOp_Add
+SourceBlend0 = Blend_One
+DestBlend0 = Blend_InvSrcAlpha
+SourceBlendAlpha0 = Blend_Zero
+DestBlendAlpha0 = Blend_One
+
+[MATERIALCONSTANTS]
+COLOR4F(Color);
+COLOR4F(GlowColor);
+FLOAT1(HalfSize);
+FLOAT1(AspectRatio);
+FLOAT1(GlowIntensity);
+FLOAT1(Opacity);
+BOOL1(UseCubeMap);
+BOOL1(Additive);
+
+[SHADER]
+#define CUSTOM_INTERPOLATOR float3 ViewDirection : TEXCOORD0;
+#define USE_WORLDPOS
+#define USE_DATAOFFSETS
+
+[VERTEXSHADER]
+#include <Shaders/Materials/MaterialVertexShader.h>
+
+VS_OUT main(VS_IN Input)
+{
+  VS_OUT Output = FillVertexData(Input);
+  float2 screenPos = sign(Input.Position.xy);
+  float4 direction = mul(GetScreenToCameraMatrix(), float4(screenPos, 1.0, 1.0));
+  direction.w = 0.0;
+  float4x4 objectToWorld = TransformToMatrix(GetInstanceData().ObjectToWorld);
+  Output.Position = float4(screenPos, 1.0, 1.0);
+  Output.ViewDirection = mul(transpose(objectToWorld), mul(GetCameraToWorldMatrix(), direction)).xyz;
+  return Output;
+}
+
+[PIXELSHADER]
+#include <Shaders/Common/GlobalConstants.h>
+#include <Shaders/Common/ObjectConstants.h>
+#include <Shaders/Materials/MaterialInterpolator.h>
+
+struct PS_GLOBALS
+{
+  PS_IN Input;
+};
+static PS_GLOBALS G;
+
+Texture2D SkyTexture BIND_GROUP(BG_MATERIAL);
+SamplerState SkyTexture_AutoSampler BIND_GROUP(BG_MATERIAL);
+TextureCube SkyCubeMap BIND_GROUP(BG_MATERIAL);
+SamplerState SkyCubeMap_AutoSampler BIND_GROUP(BG_MATERIAL);
+
+float4 main(PS_IN Input) : SV_Target
+{
+#if CAMERA_MODE == CAMERA_MODE_STEREO
+  s_ActiveCameraEyeIndex = Input.RenderTargetArrayIndex;
+#endif
+  G.Input = Input;
+  float4 texel;
+  if (GetMaterialData(UseCubeMap))
+  {
+    texel = SkyCubeMap.Sample(SkyCubeMap_AutoSampler, CubeMapDirection(Input.ViewDirection));
+  }
+  else
+  {
+    // Intersect the view ray with the tangent plane at local +X. Unlike spherical
+    // UV mapping, straight lines in the source image remain straight.
+    float3 direction = Input.ViewDirection;
+    clip(direction.x - 0.00001);
+    float2 uv = float2(direction.y / GetMaterialData(AspectRatio), -direction.z);
+    uv = uv / (2.0 * GetMaterialData(HalfSize) * max(direction.x, 0.00001)) + 0.5;
+    clip(min(uv, 1.0 - uv));
+    texel = SkyTexture.Sample(SkyTexture_AutoSampler, saturate(uv));
+  }
+
+  float alpha = saturate(texel.a * GetMaterialData(Color).a * GetMaterialData(Opacity));
+  float3 color = texel.rgb * (GetMaterialData(Color).rgb + GetMaterialData(GlowColor).rgb * GetMaterialData(GlowIntensity));
+  // Premultiplied output supports alpha-over and additive blending without changing
+  // shader permutations or materials. Preserve destination alpha in both modes.
+  return float4(color * alpha, GetMaterialData(Additive) ? 0.0 : alpha);
+}
