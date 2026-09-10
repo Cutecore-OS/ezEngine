@@ -1,0 +1,13 @@
+PluginInfo
+{
+  string %DisplayName{"Spring Bones"}
+  string %Description{"Secondary bone motion with Jolt springs, skeleton Bone Shapes and wind."}
+  string %EditorPlugins{"ezEditorPluginSpringBone"}
+  string %EditorEnginePlugins{}
+  string %RuntimePlugins{"ezSpringBonePlugin"}
+  string %PackageDependencies{}
+  string %RequiredPlugins{"Jolt"}
+  string %ExclusiveFeatures{}
+  string %EnabledInTemplates{}
+  string %CMakeTargetName{"SpringBonePlugin"}
+}
