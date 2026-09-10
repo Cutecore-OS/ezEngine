@@ -1,0 +1,27 @@
+name: Cutecore sync and integrate
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 * * * *'
+  push:
+    branches:
+      - cutecore-dev
+      - 'plugin/**'
+permissions:
+  contents: write
+concurrency:
+  group: cutecore-sync-and-integrate
+  cancel-in-progress: false
+jobs:
+  integrate:
+    if: github.repository == 'Cutecore-OS/ezEngine'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: cutecore-dev
+          fetch-depth: 0
+      - name: Sync upstream and merge published plugins
+        shell: bash
+        run: bash .github/scripts/cutecore-sync.sh
