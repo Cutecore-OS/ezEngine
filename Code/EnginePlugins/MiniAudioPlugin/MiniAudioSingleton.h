@@ -1,12 +1,14 @@
 #pragma once
 
 #include <Core/Interfaces/SoundInterface.h>
+#include <Core/ResourceManager/ResourceHandle.h>
 #include <Core/World/Declarations.h>
 #include <Foundation/Configuration/Plugin.h>
 #include <Foundation/Configuration/Singleton.h>
+#include <Foundation/Types/TagSet.h>
 #include <Foundation/Types/UniquePtr.h>
 #include <MiniAudio/miniaudio.h>
-#include <MiniAudioPlugin/MiniAudioPluginDLL.h>
+#include <MiniAudioPlugin/Effects/MiniAudioEffect.h>
 
 // TODO MiniAudio: Future Work
 //
@@ -26,6 +28,38 @@ struct ezMiniAudioSoundInstance
   ezComponentHandle m_hComponent;
   ezUInt16 m_uiOwnIndex;
   bool m_bInUse = false;
+  // Keep source identity even for detached / one-shot sounds.
+  ezGameObjectHandle m_hSourceObject;
+  ezTagSet m_SourceTags;
+  ma_sound_group* m_pGroup = nullptr;
+  bool m_bSoundInitialized = false;
+  bool m_bDecoderInitialized = false;
+  ezTypedResourceHandle<class ezMiniAudioSoundResource> m_hResource;
+  ezDynamicArray<ezMiniAudioEffect> m_Effects;
+  class ezMiniAudioEffectNode* m_pEffectNode = nullptr;
+  float m_fBasePitch = 1.0f;
+  float m_fEffectPitch = 1.0f;
+  bool m_bFinishedNotified = false;
+  ma_uint64 m_uiTailEnd = 0;
+  ezComponentHandle m_hSourceComponent;
+  ezString m_sGroup, m_sAssetGroup;
+  ezDynamicArray<ezMiniAudioEffect> m_AssetEffects;
+  class ezMiniAudioTimeStretch* m_pTimeStretch = nullptr;
+  bool m_bVolumeSource = false, m_bUseOcclusion = false;
+  float m_fVolumeWeight = 1, m_fOcclusion = 0;
+};
+
+/// Audio effects may attach/detach graph nodes here, before playback or destruction.
+/// Sent from the owning world / game thread, never from the audio callback.
+struct ezMiniAudioSoundInstanceEvent
+{
+  enum class Type
+  {
+    Created,
+    Destroying
+  };
+  Type m_Type;
+  ezMiniAudioSoundInstance* m_pInstance;
 };
 
 
@@ -41,6 +75,8 @@ public:
   void Shutdown();
 
   ma_engine* GetEngine() { return &m_pData->m_Engine; }
+  bool IsInitialized() const { return m_bInitialized; }
+  void GetSoundInstances(ezDynamicArray<ezMiniAudioSoundInstance*>& out_instances);
 
   /// Can be called before startup to load the configuration from a different file.
   /// Otherwise will automatically be loaded at startup with the default path.
@@ -77,6 +113,7 @@ public:
     ezString m_sName;
     float m_fVolume = 1.0f;
     ezUniquePtr<ma_sound_group> m_pGroup;
+    class ezMiniAudioEffectNode* m_pEffects = nullptr;
   };
 
   SoundGroup& GetSoundGroup(ezStringView sGroupName);
@@ -99,7 +136,10 @@ public:
 
   void DetachAndFadeOutSoundInstance(ezMiniAudioSoundInstance*& ref_pInstance, ezTime fadeDuration);
 
-  void SoundEnded(ezMiniAudioSoundInstance* pInstance);
+  void UpdateEffects();
+  void SetListenerComponent(ezComponentHandle hComponent);
+  void ClearListenerComponent(ezComponentHandle hComponent);
+  ezArrayPtr<const ezMiniAudioGroupEffect> GetListenerEffects() const;
 
   void StopWorldSounds(ezWorld* pWorld);
 
@@ -117,10 +157,16 @@ private:
     ezDeque<ezUInt32> m_SoundInstanceFreeList;
 
     ezDeque<ezUInt32> m_FadingInstances;
-    ezDeque<ezUInt32> m_FinishedInstances;
 
     ezHybridArray<SoundGroup, 4> m_SoundGroups;
+    class ezMiniAudioMixerNode* m_pMixer = nullptr;
+    ezComponentHandle m_hListener;
+    ezDynamicArray<ezMiniAudioGroupEffect> m_ListenerEffects;
+    ezDynamicArray<ezMiniAudioDucker> m_Duckers;
   };
 
   ezUniquePtr<Data> m_pData;
+
+public:
+  ezEvent<const ezMiniAudioSoundInstanceEvent&> m_SoundInstanceEvents;
 };

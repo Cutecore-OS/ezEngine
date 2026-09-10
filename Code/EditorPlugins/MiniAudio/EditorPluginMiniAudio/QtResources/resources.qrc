@@ -5,6 +5,10 @@
   <qresource prefix="TypeIcons">
     <file>ezMiniAudioListenerComponent.svg</file>
     <file>ezMiniAudioSoundComponent.svg</file>
+    <file>ezMiniAudioEffectBoxComponent.svg</file>
+    <file>ezMiniAudioEffectSphereComponent.svg</file>
+    <file alias="ezMiniAudioSoundBoxComponent.svg">ezMiniAudioEffectBoxComponent.svg</file>
+    <file alias="ezMiniAudioSoundSphereComponent.svg">ezMiniAudioEffectSphereComponent.svg</file>
   </qresource>  
   <qresource prefix="Icons">
     <file>SoundOn.svg</file>
