@@ -1,0 +1,13 @@
+PluginInfo
+{
+  string %DisplayName{"Grey Boxing Extended"}
+  string %Description{"Cone shapes and Smooth Shading for Grey Boxing. Independent of Grey Boxing Tools."}
+  string %EditorPlugins{"ezEditorPluginGreyBoxExtended"}
+  string %EditorEnginePlugins{}
+  string %RuntimePlugins{"ezGreyBoxPlugin"}
+  string %PackageDependencies{}
+  string %RequiredPlugins{"Scene"}
+  string %ExclusiveFeatures{}
+  string %EnabledInTemplates{}
+}
+

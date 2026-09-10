@@ -1,0 +1,9 @@
+ez_cmake_init()
+ez_requires_editor()
+ez_requires(EZ_BUILD_UNITTESTS)
+ez_create_target(APPLICATION EditorPluginGreyBoxTest)
+ez_link_target_qt(TARGET EditorPluginGreyBoxTest COMPONENTS Core Gui Widgets)
+target_link_libraries(EditorPluginGreyBoxTest PRIVATE EditorGreyBoxShared EditorPluginGreyBoxExtended TestFramework EditorPluginGreyBox EditorFramework GameEngine GreyBoxPlugin)
+ez_ci_add_test(EditorPluginGreyBoxTest)
+
+

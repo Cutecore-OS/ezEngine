@@ -1,0 +1,7 @@
+ez_cmake_init()
+ez_requires_editor()
+ez_create_target(LIBRARY EditorPluginGreyBoxExtended)
+ez_link_target_qt(TARGET EditorPluginGreyBoxExtended COMPONENTS Core Gui Widgets)
+target_link_libraries(EditorPluginGreyBoxExtended PRIVATE EditorFramework EditorGreyBoxShared GreyBoxPlugin)
+ez_copy_plugin_bundle(EditorPluginGreyBoxExtended "GreyBoxExtended")
+
