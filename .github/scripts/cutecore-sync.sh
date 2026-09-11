@@ -15,9 +15,25 @@ git checkout -B cutecore-dev origin/cutecore-dev
 # Merge upstream dev into cutecore-dev
 echo "==> 2. Merging upstream ezEngine/dev into cutecore-dev..."
 if ! git merge --no-edit -m "Sync: Merge upstream ezEngine/dev" upstream/dev; then
-  echo "::error::Merge conflict with upstream ezEngine:dev. Please resolve manually."
-  git merge --abort
-  exit 1
+  # Auto-resolve .github conflicts if upstream doesn't have them
+  mapfile -t upstream_conflicts < <(git diff --name-only --diff-filter=U)
+  real_upstream_conflicts=()
+  for file in "${upstream_conflicts[@]}"; do
+    if [[ "$file" != .github/* ]]; then
+      real_upstream_conflicts+=("$file")
+    fi
+  done
+
+  if (( ${#real_upstream_conflicts[@]} == 0 )) && (( ${#upstream_conflicts[@]} > 0 )); then
+    echo "-> Auto-resolving .github/ conflicts with upstream..."
+    git checkout HEAD -- .github/
+    git add .github/
+    git commit --no-edit
+  else
+    echo "::error::Merge conflict with upstream ezEngine:dev. Please resolve manually."
+    git merge --abort
+    exit 1
+  fi
 fi
 
 # Discover all plugin branches (origin/plugin/*)
@@ -36,13 +52,33 @@ for branch in "${plugin_branches[@]}"; do
   plugin_name="${branch#origin/}"
   echo "-> Merging plugin: $plugin_name ($branch)..."
   
-  if git merge --no-edit -m "Integrate plugin: $plugin_name" "$branch"; then
-    merged_plugins+=("$plugin_name")
+  if ! git merge --no-edit -m "Integrate plugin: $plugin_name" "$branch"; then
+    # Get all conflicted/unmerged files
+    mapfile -t unmerged_files < <(git diff --name-only --diff-filter=U)
+    
+    # Filter out files outside of .github/
+    real_conflicts=()
+    for file in "${unmerged_files[@]}"; do
+      if [[ "$file" != .github/* ]]; then
+        real_conflicts+=("$file")
+      fi
+    done
+
+    # If the ONLY conflicts are in .github/, keep HEAD's version and finish merge
+    if (( ${#real_conflicts[@]} == 0 )) && (( ${#unmerged_files[@]} > 0 )); then
+      echo "-> Auto-resolving .github/ conflicts for '$plugin_name' (keeping CI scripts)..."
+      git checkout HEAD -- .github/
+      git add .github/
+      git commit --no-edit
+      merged_plugins+=("$plugin_name")
+    else
+      echo "::error::Real merge conflict in plugin '$plugin_name'!"
+      printf '::error::Conflicted file: %s\n' "${real_conflicts[@]}"
+      git merge --abort
+      failed_plugins+=("$plugin_name")
+    fi
   else
-    echo "::error::Merge conflict in plugin '$plugin_name'!"
-    git diff --name-only --diff-filter=U
-    git merge --abort
-    failed_plugins+=("$plugin_name")
+    merged_plugins+=("$plugin_name")
   fi
 done
 
