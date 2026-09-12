@@ -212,6 +212,7 @@ void ezQtLayerDelegate::paint(QPainter* pPainter, const QStyleOptionViewItem& op
       {
         const QRect thumbnailRect = GetVisibleIconRect(opt);
         const bool bVisible = m_pDocument->IsLayerVisible(layerGuid);
+        const ezColor tint = ezColor::MakeZero(); // keep original, but ensure file uses #ffffff for tinting if needed
 
         if (bVisible)
         {

@@ -226,10 +226,14 @@ const QIcon& ezQtUiServices::GetCachedIconResource(ezStringView sIdentifier, ezC
       rep.SetFormat("#{}{}{}", ezArgU(color8.r, 2, true, 16), ezArgU(color8.g, 2, true, 16), ezArgU(color8.b, 2, true, 16));
 
       sContent.ReplaceAll_NoCase("#ffffff", rep);
+      sContent.ReplaceAll_NoCase("rgb(255, 255, 255)", rep);
+      sContent.ReplaceAll_NoCase("rgb(255,255,255)", rep);
 
       rep.Append(";");
       sContent.ReplaceAll_NoCase("#fff;", rep);
       sContent.ReplaceAll_NoCase("white;", rep);
+      sContent.ReplaceAll_NoCase("rgb(255, 255, 255);", rep);
+      sContent.ReplaceAll_NoCase("rgb(255,255,255);", rep);
       rep.Shrink(0, 1);
 
       rep.Prepend("\"");
