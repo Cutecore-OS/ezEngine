@@ -271,7 +271,9 @@ void ezQtGameObjectDelegate::paint(QPainter* pPainter, const QStyleOptionViewIte
 
     if (bIsHidden)
     {
-      ezQtUiServices::GetSingleton()->GetCachedIconResource(":/EditorFramework/Icons/ObjectsHidden.svg").paint(pPainter, iconRect, Qt::AlignmentFlag::AlignCenter, QIcon::Mode::Normal);
+      // Use text color as tint so white SVG becomes visible on both light/dark themes
+      const ezColor tint = qtToEzColor(option.palette.color(QPalette::Text));
+      ezQtUiServices::GetSingleton()->GetCachedIconResource(":/EditorFramework/Icons/ObjectsHidden.svg", tint).paint(pPainter, iconRect, Qt::AlignmentFlag::AlignCenter, QIcon::Mode::Normal);
     }
   }
 
@@ -281,7 +283,8 @@ void ezQtGameObjectDelegate::paint(QPainter* pPainter, const QStyleOptionViewIte
 
     if (bIsActiveParent)
     {
-      ezQtUiServices::GetSingleton()->GetCachedIconResource(":/EditorFramework/Icons/ActiveParent.svg").paint(pPainter, iconRect, Qt::AlignmentFlag::AlignCenter, QIcon::Mode::Normal);
+      const ezColor tint = qtToEzColor(option.palette.color(QPalette::Text));
+      ezQtUiServices::GetSingleton()->GetCachedIconResource(":/EditorFramework/Icons/ActiveParent.svg", tint).paint(pPainter, iconRect, Qt::AlignmentFlag::AlignCenter, QIcon::Mode::Normal);
     }
   }
 }
