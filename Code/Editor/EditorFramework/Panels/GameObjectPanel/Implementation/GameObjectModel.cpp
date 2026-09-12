@@ -212,6 +212,7 @@ void ezQtGameObjectAdapter::DocumentObjectMetaDataEventHandler(const ezObjectMet
   v.push_back(Qt::FontRole);
   v.push_back(Qt::DecorationRole);
   v.push_back(Qt::ForegroundRole);
+  v.push_back(UserRoles::HiddenRole);
   dataChanged(pObject, v);
 }
 

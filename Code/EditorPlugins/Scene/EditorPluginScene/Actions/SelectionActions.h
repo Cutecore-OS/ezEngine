@@ -87,6 +87,8 @@ public:
 
   void CreatePrefab();
 
+  virtual void RefreshState() override { UpdateEnableState(); }
+
 private:
   void SelectionEventHandler(const ezSelectionManagerEvent& e);
 

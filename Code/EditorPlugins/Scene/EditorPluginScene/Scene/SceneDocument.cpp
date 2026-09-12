@@ -733,6 +733,41 @@ void ezSceneDocument::ShowOrHideSelectedObjects(ShowOrHide action)
   }
 }
 
+bool ezSceneDocument::IsSelectionAllHidden() const
+{
+  const auto& sel = GetSelectionManager()->GetSelection();
+  bool bHasGameObject = false;
+
+  for (auto pItem : sel)
+  {
+    if (!pItem->GetTypeAccessor().GetType()->IsDerivedFrom<ezGameObject>())
+      continue;
+
+    bHasGameObject = true;
+
+    auto pMeta = m_DocumentObjectMetaData->BeginReadMetaData(pItem->GetGuid());
+    const bool bHidden = pMeta->m_bHidden;
+    m_DocumentObjectMetaData->EndReadMetaData();
+
+    if (!bHidden)
+      return false;
+  }
+
+  return bHasGameObject;
+}
+
+void ezSceneDocument::ToggleHideSelectedObjects()
+{
+  if (IsSelectionAllHidden())
+  {
+    ShowOrHideSelectedObjects(ShowOrHide::Show);
+  }
+  else
+  {
+    ShowOrHideSelectedObjects(ShowOrHide::Hide);
+  }
+}
+
 void ezSceneDocument::HideUnselectedObjects()
 {
   ShowOrHideAllObjects(ShowOrHide::Hide);

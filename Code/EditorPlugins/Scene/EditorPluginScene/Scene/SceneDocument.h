@@ -84,6 +84,8 @@ public:
   void ShowOrHideSelectedObjects(ShowOrHide action);
   void ShowOrHideAllObjects(ShowOrHide action);
   void HideUnselectedObjects();
+  bool IsSelectionAllHidden() const;
+  void ToggleHideSelectedObjects();
 
   /// Whether this document represents a prefab or a scene
   bool IsPrefab() const { return m_DocumentType == DocumentType::Prefab; }

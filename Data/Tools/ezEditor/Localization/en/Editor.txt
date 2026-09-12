@@ -183,7 +183,8 @@ Selection.ShowInScenegraph;Show in Scenegraph
 Selection.FocusSingleView;Focus on Selection
 Selection.FocusAllViews;Focus All Views on Selection
 Selection.GroupItems;Group
-Selection.HideItems;Hide Selected
+Selection.HideItems;Hide/Unhide Selected
+Selection.UnhideItems;Unhide Selected
 Selection.HideUnselectedItems;Hide Unselected
 Selection.ShowHidden;Show Hidden Objects
 Selection.CreateEmptyChildObject;Create Empty Child Object

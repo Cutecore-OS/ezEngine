@@ -299,9 +299,17 @@ void ezSelectionAction::Execute(const ezVariant& value)
       return;
     }
     case ActionType::HideSelectedObjects:
-      m_pSceneDocument->ShowOrHideSelectedObjects(ezSceneDocument::ShowOrHide::Hide);
-      m_pSceneDocument->ShowDocumentStatus("Hiding selected objects");
+    {
+      const bool bWasAllHidden = m_pSceneDocument->IsSelectionAllHidden();
+      m_pSceneDocument->ToggleHideSelectedObjects();
+      if (bWasAllHidden)
+        m_pSceneDocument->ShowDocumentStatus("Showing selected objects");
+      else
+        m_pSceneDocument->ShowDocumentStatus("Hiding selected objects");
+
+      UpdateEnableState();
       break;
+    }
     case ActionType::HideUnselectedObjects:
       m_pSceneDocument->HideUnselectedObjects();
       m_pSceneDocument->ShowDocumentStatus("Hiding unselected objects");
@@ -512,9 +520,31 @@ void ezSelectionAction::SelectionEventHandler(const ezSelectionManagerEvent& e)
 
 void ezSelectionAction::UpdateEnableState()
 {
-  if (m_Type == ActionType::HideSelectedObjects || m_Type == ActionType::DuplicateSpecial || m_Type == ActionType::DeltaTransform ||
-      m_Type == ActionType::SnapObjectToCamera || m_Type == ActionType::DetachFromParent || m_Type == ActionType::HideUnselectedObjects ||
-      m_Type == ActionType::AttachToObject)
+  if (m_Type == ActionType::HideSelectedObjects)
+  {
+    const bool bIsEmpty = m_Context.m_pDocument->GetSelectionManager()->IsSelectionEmpty();
+    SetEnabled(!bIsEmpty, false);
+
+    if (!bIsEmpty)
+    {
+      if (m_pSceneDocument->IsSelectionAllHidden())
+      {
+        // Use ShowHidden icon when all selected are hidden, but keep name as Hide/Unhide for consistency
+        // (context menu will show Hide/Unhide with unhide icon)
+        SetIconPath(":/EditorPluginScene/Icons/ShowHidden.svg");
+      }
+      else
+      {
+        SetIconPath(":/EditorPluginScene/Icons/HideSelected.svg");
+      }
+      // Always use HideItems (Hide/Unhide Selected) to keep label stable
+      m_sName = "Selection.HideItems";
+    }
+
+    TriggerUpdate();
+  }
+  else if (m_Type == ActionType::DuplicateSpecial || m_Type == ActionType::DeltaTransform || m_Type == ActionType::SnapObjectToCamera ||
+           m_Type == ActionType::DetachFromParent || m_Type == ActionType::HideUnselectedObjects || m_Type == ActionType::AttachToObject)
   {
     SetEnabled(!m_Context.m_pDocument->GetSelectionManager()->IsSelectionEmpty());
   }
