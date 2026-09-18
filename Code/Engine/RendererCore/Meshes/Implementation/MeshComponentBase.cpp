@@ -175,14 +175,15 @@ ezResult ezMeshComponentBase::GetLocalBounds(ezBoundingBoxSphere& ref_bounds, bo
 
 void ezMeshComponentBase::OnMsgExtractRenderData(ezMsgExtractRenderData& msg) const
 {
-  if (!m_hMesh.IsValid())
+  const ezMeshResourceHandle& hMeshToRender = GetMeshToRender();
+  if (!hMeshToRender.IsValid())
     return;
 
   const bool bDynamic = GetOwner()->IsDynamic();
   const ezTransform finalTransform = GetFinalGlobalTransform();
   auto hInstanceDataBuffer = msg.m_pRenderDataManager->GetOrCreateInstanceDataAndFill(*this, bDynamic, finalTransform, m_InstanceDataOffset, GetUniqueIdForRendering(), m_Color, m_vCustomData);
 
-  ezResourceLock<ezMeshResource> pMesh(m_hMesh, ezResourceAcquireMode::AllowLoadingFallback);
+  ezResourceLock<ezMeshResource> pMesh(hMeshToRender, ezResourceAcquireMode::AllowLoadingFallback);
   ezArrayPtr<const ezMeshResourceDescriptor::SubMesh> parts = pMesh->GetSubMeshes();
 
   for (ezUInt32 uiPartIndex = 0; uiPartIndex < parts.GetCount(); ++uiPartIndex)
@@ -207,7 +208,7 @@ void ezMeshComponentBase::OnMsgExtractRenderData(ezMsgExtractRenderData& msg) co
       pRenderData->m_hCustomInstanceDataBuffer = m_hCustomInstanceDataBuffer;
 
       pRenderData->SetFallbackGlobalBounds(GetOwner()->GetGlobalBounds());
-      pRenderData->Fill(m_InstanceDataOffset, hInstanceDataBuffer, hMaterial, m_hMesh, uiMaterialIndex, uiPartIndex);
+      pRenderData->Fill(m_InstanceDataOffset, hInstanceDataBuffer, hMaterial, hMeshToRender, uiMaterialIndex, uiPartIndex);
     }
 
     bool bDontCacheYet = false;

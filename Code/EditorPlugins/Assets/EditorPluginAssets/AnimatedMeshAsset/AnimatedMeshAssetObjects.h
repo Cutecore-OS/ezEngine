@@ -19,6 +19,7 @@ public:
   ezString m_sMeshIncludeTags;
   ezString m_sMeshExcludeTags;
   ezString m_sDefaultSkeleton;
+  ezString m_sDefaultBlendShapes;
 
   bool m_bRecalculateNormals = false;
   bool m_bRecalculateTangents = true;

@@ -21,6 +21,7 @@ bool ezMeshAssetDocumentGenerator::s_bCreateMaterials = true;
 bool ezMeshAssetDocumentGenerator::s_bUseSharedMaterials = false;
 bool ezMeshAssetDocumentGenerator::s_bReuseSkeleton = false;
 bool ezMeshAssetDocumentGenerator::s_bImportAllClips = false;
+bool ezMeshAssetDocumentGenerator::s_bImportBlendShapes = false;
 bool ezMeshAssetDocumentGenerator::s_bAddLODs = false;
 ezUInt8 ezMeshAssetDocumentGenerator::s_uiNumLODs = 1;
 ezUuid ezMeshAssetDocumentGenerator::s_SharedSkeleton;
@@ -84,6 +85,7 @@ ezStatus ezMeshAssetDocumentGenerator::Generate(ezStringView sInputFileAbs, ezSt
     dlg.m_bReuseExistingSkeleton = s_bReuseSkeleton;
     dlg.m_SharedSkeleton = s_SharedSkeleton;
     dlg.m_bImportAnimationClips = s_bImportAllClips;
+    dlg.m_bImportBlendShapes = s_bImportBlendShapes;
     dlg.m_bAddLODs = s_bAddLODs;
     dlg.m_uiNumLODs = s_uiNumLODs;
     dlg.m_sMeshLodPrefix = pPref->m_sMeshLodPrefix.IsEmpty() ? ezString("$LOD") : pPref->m_sMeshLodPrefix;
@@ -118,6 +120,7 @@ ezStatus ezMeshAssetDocumentGenerator::Generate(ezStringView sInputFileAbs, ezSt
       s_bReuseSkeleton = dlg.m_bReuseExistingSkeleton;
       s_SharedSkeleton = dlg.m_SharedSkeleton;
       s_bImportAllClips = dlg.m_bImportAnimationClips;
+      s_bImportBlendShapes = dlg.m_bImportBlendShapes;
     }
 
     if (dlg.m_bApplyToAll)
@@ -136,7 +139,7 @@ ezStatus ezMeshAssetDocumentGenerator::Generate(ezStringView sInputFileAbs, ezSt
   ezTempHybridArray<ezMaterialResourceSlot, 8> materials;
   ezUniquePtr<ezModelImporter2::Importer> pImporter;
 
-  if (s_bCreateMaterials || (m_bAnimatedMesh && s_bImportAllClips))
+  if (s_bCreateMaterials || (m_bAnimatedMesh && (s_bImportAllClips || s_bImportBlendShapes)))
   {
     pImporter = ezModelImporter2::RequestImporterForFileType(sInputFileAbs);
     if (pImporter == nullptr)
@@ -352,6 +355,49 @@ ezStatus ezAnimatedMeshAssetDocumentGenerator::ConfigureMeshDocument(ezStringVie
     }
   }
 
+  ezUuid blendShapeGuid;
+
+  // create blend shape asset
+  if (s_bImportBlendShapes)
+  {
+    ezStringBuilder sOutFileBS = sOutFile;
+    sOutFileBS.ChangeFileExtension("ezBlendShapeAsset");
+
+    if (ezOSFile::ExistsFile(sOutFileBS))
+    {
+      ezLog::Info("Skipping blend shape import, file has been imported before: '{}'", sOutFileBS);
+
+      auto pBSDoc = ezAssetCurator::GetSingleton()->FindSubAsset(sOutFileBS);
+      if (pBSDoc != nullptr)
+      {
+        blendShapeGuid = pBSDoc->m_Data.m_Guid;
+      }
+    }
+    else
+    {
+      ezDocument* pBSDoc = pApp->CreateDocument(sOutFileBS, ezDocumentFlags::None);
+      if (pBSDoc != nullptr)
+      {
+        ezStringBuilder sAnimMeshGuid;
+        ezConversionUtils::ToString(pMainDoc->GetGuid(), sAnimMeshGuid);
+
+        out_generatedDocuments.PushBack(pBSDoc);
+
+        auto pBSPropObj = pBSDoc->GetPropertyObject();
+
+        ezObjectCommandAccessor ca(pBSDoc->GetCommandHistory());
+        ca.StartTransaction("Init Values");
+        ca.SetValueByName(pBSPropObj, "File", sInputFile).AssertSuccess();
+        ca.SetValueByName(pBSPropObj, "PreviewMesh", sAnimMeshGuid.GetView()).AssertSuccess();
+        ca.FinishTransaction();
+
+        blendShapeGuid = pBSDoc->GetGuid();
+
+        ezLog::Success("Imported blend shapes: '{}'", sOutFileBS);
+      }
+    }
+  }
+
   // configure animated mesh asset
   {
     ezStringBuilder sFinalName, sFinalPath;
@@ -401,6 +447,13 @@ ezStatus ezAnimatedMeshAssetDocumentGenerator::ConfigureMeshDocument(ezStringVie
       ca.SetValueByName(pPropObj, "MeshFile", sInputFile).AssertSuccess();
       ca.SetValueByName(pPropObj, "ImportMaterials", false).AssertSuccess();
       ca.SetValueByName(pPropObj, "DefaultSkeleton", sSkeletonGuid.GetView()).AssertSuccess();
+
+      if (blendShapeGuid.IsValid())
+      {
+        ezStringBuilder sBlendShapeGuid;
+        ezConversionUtils::ToString(blendShapeGuid, sBlendShapeGuid);
+        ca.SetValueByName(pPropObj, "DefaultBlendShapes", sBlendShapeGuid.GetView()).AssertSuccess();
+      }
 
       for (ezUInt32 i = 0; i < materials.GetCount(); ++i)
       {

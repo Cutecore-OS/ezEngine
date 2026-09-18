@@ -2,6 +2,7 @@
 
 #include <Core/ResourceManager/ResourceHandle.h>
 #include <Foundation/Communication/Message.h>
+#include <Foundation/Containers/ArrayMap.h>
 #include <RendererCore/RendererCoreDLL.h>
 #include <ozz/base/maths/soa_transform.h>
 
@@ -181,6 +182,33 @@ struct EZ_RENDERERCORE_DLL ezMsgAnimationCurveValue : public ezMessage
   float m_fMin = 0.0f;         ///< Minimum sampled value across all contributing clips.
   float m_fMax = 0.0f;         ///< Maximum sampled value across all contributing clips.
   float m_fAverage = 0.0f;     ///< Weighted average of the sampled values, weighted by each clip's blend weight.
+};
+
+using ezBlendShapeResourceHandle = ezTypedResourceHandle<class ezBlendShapeResource>;
+
+/// Sent to set a specific blend shape weight on an animated mesh or blend shape pose component.
+struct EZ_RENDERERCORE_DLL ezMsgSetBlendShapeWeight : public ezMessage
+{
+  EZ_DECLARE_MESSAGE_TYPE(ezMsgSetBlendShapeWeight, ezMessage);
+
+  ezHashedString m_sShapeName;
+  float m_fWeight = 0.0f;
+};
+
+/// Sent to update multiple blend shape weights at once.
+struct EZ_RENDERERCORE_DLL ezMsgBlendShapesPoseUpdated : public ezMessage
+{
+  EZ_DECLARE_MESSAGE_TYPE(ezMsgBlendShapesPoseUpdated, ezMessage);
+
+  ezArrayMap<ezHashedString, float> m_Weights;
+};
+
+/// Queries the blend shape resource from an animated mesh or similar component.
+struct EZ_RENDERERCORE_DLL ezMsgQueryAnimationBlendShapes : public ezMessage
+{
+  EZ_DECLARE_MESSAGE_TYPE(ezMsgQueryAnimationBlendShapes, ezMessage);
+
+  ezBlendShapeResourceHandle m_hBlendShapes;
 };
 
 /// Queries the local transforms of each bone in an object with a skeleton

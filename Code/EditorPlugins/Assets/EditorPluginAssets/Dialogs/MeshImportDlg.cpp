@@ -20,6 +20,7 @@ void ezMeshImportDlg::showEvent(QShowEvent* e)
   Animations->setVisible(m_bShowAnimMeshOptions);
   ApplyToAll->setChecked(m_bApplyToAll);
   ImportAnimClips->setChecked(m_bImportAnimationClips);
+  ImportBlendShapes->setChecked(m_bImportBlendShapes);
   ReuseSkeleton->setChecked(m_bReuseExistingSkeleton);
   UseSharedMaterials->setChecked(m_bUseSharedMaterials);
   Lod->setChecked(m_bAddLODs);
@@ -108,6 +109,7 @@ void ezMeshImportDlg::on_Buttons_accepted()
 {
   m_bCreateMaterials = Materials->isChecked();
   m_bImportAnimationClips = ImportAnimClips->isChecked();
+  m_bImportBlendShapes = ImportBlendShapes->isChecked();
   m_bApplyToAll = ApplyToAll->isChecked();
   m_bAddLODs = Lod->isChecked();
   m_uiNumLODs = NumLODs->value();

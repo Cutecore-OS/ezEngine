@@ -147,6 +147,13 @@
         </property>
        </widget>
       </item>
+      <item>
+       <widget class="QCheckBox" name="ImportBlendShapes">
+        <property name="text">
+         <string>Import shape keys / blend shapes</string>
+        </property>
+       </widget>
+      </item>
      </layout>
     </widget>
    </item>

@@ -42,6 +42,7 @@ void ezMeshResourceDescriptor::Clear()
   m_Materials.Clear();
   m_MeshBufferDescriptor.Clear();
   m_SubMeshes.Clear();
+  m_hDefaultBlendShapes.Invalidate();
 }
 
 ezMeshBufferResourceDescriptor& ezMeshResourceDescriptor::MeshBufferDesc()
@@ -287,6 +288,15 @@ void ezMeshResourceDescriptor::Save(ezStreamWriter& inout_stream)
     chunk.EndChunk();
   }
 
+  if (m_hDefaultBlendShapes.IsValid())
+  {
+    chunk.BeginChunk("BlendShapes", 1);
+
+    chunk << m_hDefaultBlendShapes;
+
+    chunk.EndChunk();
+  }
+
   chunk.EndStream();
 
 #ifdef BUILDSYSTEM_ENABLE_ZSTD_SUPPORT
@@ -526,6 +536,11 @@ ezResult ezMeshResourceDescriptor::Load(ezStreamReader& inout_stream)
     if (ci.m_sChunkName == "Skeleton")
     {
       chunk >> m_hDefaultSkeleton;
+    }
+
+    if (ci.m_sChunkName == "BlendShapes")
+    {
+      chunk >> m_hDefaultBlendShapes;
     }
 
     chunk.NextChunk();

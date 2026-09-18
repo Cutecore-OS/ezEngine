@@ -141,6 +141,7 @@ public:
 protected:
   virtual ezTransform GetFinalGlobalTransform() const;
   virtual ezMeshRenderData* CreateRenderData(const ezRenderDataManager* pRenderDataManager) const;
+  virtual const ezMeshResourceHandle& GetMeshToRender() const { return m_hMesh; }
 
   // TODO: Using ezStringView for the array accessors doesn't work (currently)
 

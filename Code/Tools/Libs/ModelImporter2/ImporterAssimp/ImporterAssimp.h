@@ -30,6 +30,7 @@ namespace ezModelImporter2
 
     ezResult ImportMaterials();
     ezResult ImportAnimations();
+    ezResult ImportBlendShapes();
 
     ezResult ImportBoneColliders(ezEditableSkeletonJoint* pJoint);
 

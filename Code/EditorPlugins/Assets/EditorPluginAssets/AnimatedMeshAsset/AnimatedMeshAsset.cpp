@@ -4,6 +4,8 @@
 #include <EditorPluginAssets/Util/MeshImportUtils.h>
 #include <Foundation/Utilities/Progress.h>
 #include <ModelImporter2/ModelImporter.h>
+#include <RendererCore/AnimationSystem/BlendShapeResource.h>
+#include <RendererCore/AnimationSystem/SkeletonResource.h>
 #include <RendererCore/Meshes/MeshResourceDescriptor.h>
 
 // clang-format off
@@ -42,6 +44,11 @@ ezTransformStatus ezAnimatedMeshAssetDocument::InternalTransformAsset(ezStreamWr
   if (!pProp->m_sDefaultSkeleton.IsEmpty())
   {
     desc.m_hDefaultSkeleton = ezResourceManager::LoadResource<ezSkeletonResource>(pProp->m_sDefaultSkeleton);
+  }
+
+  if (!pProp->m_sDefaultBlendShapes.IsEmpty())
+  {
+    desc.m_hDefaultBlendShapes = ezResourceManager::LoadResource<ezBlendShapeResource>(pProp->m_sDefaultBlendShapes);
   }
 
   desc.Save(stream);

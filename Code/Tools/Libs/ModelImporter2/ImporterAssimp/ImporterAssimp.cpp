@@ -3,6 +3,7 @@
 #include <Foundation/Logging/Log.h>
 #include <ModelImporter2/ImporterAssimp/ImporterAssimp.h>
 
+#include <RendererCore/AnimationSystem/EditableBlendShapes.h>
 #include <RendererCore/AnimationSystem/EditableSkeleton.h>
 #include <RendererCore/Meshes/MeshBufferResource.h>
 #include <RendererCore/Meshes/MeshResourceDescriptor.h>
@@ -128,6 +129,8 @@ namespace ezModelImporter2
     EZ_SUCCEED_OR_RETURN(TraverseAiScene());
 
     EZ_SUCCEED_OR_RETURN(PrepareOutputMesh());
+
+    EZ_SUCCEED_OR_RETURN(ImportBlendShapes());
 
     EZ_SUCCEED_OR_RETURN(ImportAnimations());
 
@@ -300,6 +303,88 @@ namespace ezModelImporter2
           else
           {
             // ezLog::Error("TODO: error message");
+          }
+        }
+      }
+    }
+
+    return EZ_SUCCESS;
+  }
+
+  ezResult ImporterAssimp::ImportBlendShapes()
+  {
+    if (m_Options.m_pBlendShapesOutput == nullptr)
+      return EZ_SUCCESS;
+
+    if (m_pScene == nullptr || m_pScene->mNumMeshes == 0)
+      return EZ_SUCCESS;
+
+    m_OutputBlendShapeNames.Clear();
+
+    // Copy base mesh buffer desc if available
+    if (m_Options.m_pMeshOutput != nullptr)
+    {
+      m_Options.m_pBlendShapesOutput->m_MeshBufferDesc = m_Options.m_pMeshOutput->MeshBufferDesc();
+    }
+
+    ezMap<ezString, ezUInt32> channelNameToIndex;
+
+    for (ezUInt32 meshIdx = 0; meshIdx < m_pScene->mNumMeshes; ++meshIdx)
+    {
+      const aiMesh* pMesh = m_pScene->mMeshes[meshIdx];
+      if (pMesh == nullptr || pMesh->mNumAnimMeshes == 0 || pMesh->mAnimMeshes == nullptr)
+        continue;
+
+      for (ezUInt32 animMeshIdx = 0; animMeshIdx < pMesh->mNumAnimMeshes; ++animMeshIdx)
+      {
+        const aiAnimMesh* pAnimMesh = pMesh->mAnimMeshes[animMeshIdx];
+        if (pAnimMesh == nullptr)
+          continue;
+
+        ezStringBuilder sName = pAnimMesh->mName.C_Str();
+        if (sName.IsEmpty())
+        {
+          sName.SetFormat("Shape_{}", animMeshIdx);
+        }
+
+        ezUInt32 uiChannelIdx = 0;
+        if (!channelNameToIndex.TryGetValue(sName, uiChannelIdx))
+        {
+          uiChannelIdx = m_Options.m_pBlendShapesOutput->m_Channels.GetCount();
+          channelNameToIndex[sName] = uiChannelIdx;
+
+          auto& ch = m_Options.m_pBlendShapesOutput->m_Channels.ExpandAndGetRef();
+          ch.m_sName = sName;
+          ch.m_fDefaultWeight = 0.0f;
+          ch.m_fMinWeight = 0.0f;
+          ch.m_fMaxWeight = 1.0f;
+
+          m_OutputBlendShapeNames.PushBack(sName);
+        }
+
+        auto& channel = m_Options.m_pBlendShapesOutput->m_Channels[uiChannelIdx];
+
+        const ezUInt32 uiVertexCount = ezMath::Min(pMesh->mNumVertices, pAnimMesh->mNumVertices);
+        for (ezUInt32 v = 0; v < uiVertexCount; ++v)
+        {
+          ezVec3 posBase = ConvertAssimpType(pMesh->mVertices[v]);
+          ezVec3 posTarget = pAnimMesh->mVertices ? ConvertAssimpType(pAnimMesh->mVertices[v]) : posBase;
+          ezVec3 posDelta = posTarget - posBase;
+
+          ezVec3 nrmDelta = ezVec3::MakeZero();
+          if (pMesh->mNormals && pAnimMesh->mNormals)
+          {
+            ezVec3 nrmBase = ConvertAssimpType(pMesh->mNormals[v]);
+            ezVec3 nrmTarget = ConvertAssimpType(pAnimMesh->mNormals[v]);
+            nrmDelta = nrmTarget - nrmBase;
+          }
+
+          if (posDelta.GetLengthSquared() > 1e-8f || nrmDelta.GetLengthSquared() > 1e-8f)
+          {
+            auto& delta = channel.m_Deltas.ExpandAndGetRef();
+            delta.m_uiVertexIndex = v;
+            delta.m_vPositionDelta = posDelta;
+            delta.m_vNormalDelta = nrmDelta;
           }
         }
       }

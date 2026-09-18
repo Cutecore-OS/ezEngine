@@ -19,6 +19,7 @@ public:
   bool m_bShowAnimMeshOptions = false;
   bool m_bReuseExistingSkeleton = false;
   bool m_bImportAnimationClips = false;
+  bool m_bImportBlendShapes = false;
   bool m_bAddLODs = false;
   ezUInt8 m_uiNumLODs = 1;
   ezUuid m_SharedSkeleton;

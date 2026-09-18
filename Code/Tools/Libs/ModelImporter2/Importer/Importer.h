@@ -8,6 +8,7 @@
 class ezLogInterface;
 class ezProgress;
 class ezEditableSkeleton;
+class ezEditableBlendShapes;
 class ezMeshResourceDescriptor;
 struct ezAnimationClipResourceDescriptor;
 
@@ -42,6 +43,7 @@ namespace ezModelImporter2
     ezMeshResourceDescriptor* m_pMeshOutput = nullptr;
 
     ezEditableSkeleton* m_pSkeletonOutput = nullptr;
+    ezEditableBlendShapes* m_pBlendShapesOutput = nullptr;
 
     bool m_bAdditiveAnimation = false;
     AdditiveReference m_AdditiveReference = AdditiveReference::FirstKeyFrame;
@@ -116,6 +118,7 @@ namespace ezModelImporter2
     ezMap<ezString, OutputTexture> m_OutputTextures; // path -> additional data
     ezDeque<OutputMaterial> m_OutputMaterials;
     ezDynamicArray<ezString> m_OutputAnimationNames;
+    ezDynamicArray<ezString> m_OutputBlendShapeNames;
     ezDynamicArray<ezString> m_OutputMeshNames;
 
   protected:

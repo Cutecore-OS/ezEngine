@@ -2,6 +2,7 @@
 
 #include <Foundation/IO/Stream.h>
 #include <Foundation/Math/BoundingBoxSphere.h>
+#include <RendererCore/AnimationSystem/BlendShapeResource.h>
 #include <RendererCore/AnimationSystem/SkeletonResource.h>
 #include <RendererCore/Meshes/MeshBufferResource.h>
 
@@ -85,6 +86,7 @@ public:
   };
 
   ezSkeletonResourceHandle m_hDefaultSkeleton;   ///< Default skeleton for skinned meshes.
+  ezBlendShapeResourceHandle m_hDefaultBlendShapes; ///< Default blend shapes for animated meshes.
   ezHashTable<ezHashedString, BoneData> m_Bones; ///< Bone data indexed by bone name.
 
   /// Maximum distance between any vertex and its influencing bones.

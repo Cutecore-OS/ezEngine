@@ -88,6 +88,26 @@ EZ_BEGIN_DYNAMIC_REFLECTED_TYPE(ezMsgAnimationCurveValue, 1, ezRTTIDefaultAlloca
 }
 EZ_END_DYNAMIC_REFLECTED_TYPE;
 
+EZ_IMPLEMENT_MESSAGE_TYPE(ezMsgSetBlendShapeWeight);
+EZ_BEGIN_DYNAMIC_REFLECTED_TYPE(ezMsgSetBlendShapeWeight, 1, ezRTTIDefaultAllocator<ezMsgSetBlendShapeWeight>)
+{
+  EZ_BEGIN_PROPERTIES
+  {
+    EZ_MEMBER_PROPERTY("ShapeName", m_sShapeName),
+    EZ_MEMBER_PROPERTY("Weight", m_fWeight),
+  }
+  EZ_END_PROPERTIES;
+}
+EZ_END_DYNAMIC_REFLECTED_TYPE;
+
+EZ_IMPLEMENT_MESSAGE_TYPE(ezMsgBlendShapesPoseUpdated);
+EZ_BEGIN_DYNAMIC_REFLECTED_TYPE(ezMsgBlendShapesPoseUpdated, 1, ezRTTIDefaultAllocator<ezMsgBlendShapesPoseUpdated>)
+EZ_END_DYNAMIC_REFLECTED_TYPE;
+
+EZ_IMPLEMENT_MESSAGE_TYPE(ezMsgQueryAnimationBlendShapes);
+EZ_BEGIN_DYNAMIC_REFLECTED_TYPE(ezMsgQueryAnimationBlendShapes, 1, ezRTTIDefaultAllocator<ezMsgQueryAnimationBlendShapes>)
+EZ_END_DYNAMIC_REFLECTED_TYPE;
+
 EZ_IMPLEMENT_MESSAGE_TYPE(ezMsgRetrieveBoneState);
 EZ_BEGIN_DYNAMIC_REFLECTED_TYPE(ezMsgRetrieveBoneState, 1, ezRTTIDefaultAllocator<ezMsgRetrieveBoneState>)
 {
