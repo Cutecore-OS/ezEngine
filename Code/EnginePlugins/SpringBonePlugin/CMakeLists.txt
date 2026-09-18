@@ -1,0 +1,6 @@
+ez_cmake_init()
+ez_requires(EZ_3RDPARTY_JOLT_SUPPORT)
+get_filename_component(PROJECT_NAME ${CMAKE_CURRENT_SOURCE_DIR} NAME_WE)
+ez_create_target(LIBRARY ${PROJECT_NAME})
+target_link_libraries(${PROJECT_NAME} PUBLIC GameEngine JoltPlugin)
+ez_copy_plugin_bundle(${PROJECT_NAME} "SpringBone")

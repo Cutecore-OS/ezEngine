@@ -38,8 +38,15 @@ void ezMiniAudioListenerComponentManager::UpdateListeners(const ezWorldModule::U
 //////////////////////////////////////////////////////////////////////////
 
 // clang-format off
-EZ_BEGIN_COMPONENT_TYPE(ezMiniAudioListenerComponent, 1, ezComponentMode::Static)
+EZ_BEGIN_COMPONENT_TYPE(ezMiniAudioListenerComponent, 2, ezComponentMode::Static)
 {
+  EZ_BEGIN_PROPERTIES
+  {
+    EZ_ARRAY_MEMBER_PROPERTY("Effects", m_Effects),
+    EZ_MEMBER_PROPERTY("Ducker", m_bDucker),
+    EZ_ARRAY_MEMBER_PROPERTY("Duckers", m_Duckers),
+  }
+  EZ_END_PROPERTIES;
   EZ_BEGIN_ATTRIBUTES
   {
     new ezCategoryAttribute("Sound/MiniAudio"),
@@ -57,6 +64,9 @@ void ezMiniAudioListenerComponent::SerializeComponent(ezWorldWriter& inout_strea
   SUPER::SerializeComponent(inout_stream);
 
   auto& s = inout_stream.GetStream();
+  s.WriteArray(m_Effects).IgnoreResult();
+  s << m_bDucker;
+  s.WriteArray(m_Duckers).IgnoreResult();
 }
 
 void ezMiniAudioListenerComponent::DeserializeComponent(ezWorldReader& inout_stream)
@@ -65,6 +75,18 @@ void ezMiniAudioListenerComponent::DeserializeComponent(ezWorldReader& inout_str
   // const ezUInt32 uiVersion = stream.GetComponentTypeVersion(GetStaticRTTI());
 
   auto& s = inout_stream.GetStream();
+  if (inout_stream.GetComponentTypeVersion(GetStaticRTTI()) >= 2)
+  {
+    s.ReadArray(m_Effects).IgnoreResult();
+    s >> m_bDucker;
+    s.ReadArray(m_Duckers).IgnoreResult();
+  }
+}
+
+void ezMiniAudioListenerComponent::OnDeactivated()
+{
+  ezMiniAudioSingleton::GetSingleton()->ClearListenerComponent(GetHandle());
+  SUPER::OnDeactivated();
 }
 
 void ezMiniAudioListenerComponent::Update()
@@ -75,5 +97,5 @@ void ezMiniAudioListenerComponent::Update()
   const auto up = (GetOwner()->GetGlobalRotation() * ezVec3::MakeAxisZ()).GetNormalized();
 
   ezMiniAudioSingleton::GetSingleton()->SetListener(0, pos, fwd, up, vel);
+  ezMiniAudioSingleton::GetSingleton()->SetListenerComponent(GetHandle());
 }
-

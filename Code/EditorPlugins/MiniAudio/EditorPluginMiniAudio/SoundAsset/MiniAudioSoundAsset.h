@@ -2,6 +2,7 @@
 
 #include <EditorFramework/Assets/AssetDocumentGenerator.h>
 #include <EditorFramework/Assets/SimpleAssetDocument.h>
+#include <MiniAudioPlugin/Effects/MiniAudioEffect.h>
 
 class ezMiniAudioSoundAssetProperties : public ezReflectedClass
 {
@@ -12,6 +13,8 @@ public:
 
   static void PropertyMetaStateEventHandler(ezPropertyMetaStateEvent& e);
 
+  ezDynamicArray<ezMiniAudioEffect> m_Effects;
+  bool m_bRandomWithoutRepeats = false;
   ezString m_sGroup;
   bool m_bLoop = false;
   float m_fMinVolume = 1.0f;
