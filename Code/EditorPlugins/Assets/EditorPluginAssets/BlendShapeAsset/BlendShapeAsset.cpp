@@ -1,9 +1,11 @@
 #include <EditorPluginAssets/EditorPluginAssetsPCH.h>
 
+#include <EditorFramework/GUI/ExposedParameters.h>
 #include <EditorPluginAssets/BlendShapeAsset/BlendShapeAsset.h>
 #include <Foundation/Utilities/Progress.h>
 #include <ModelImporter2/ModelImporter.h>
 #include <RendererCore/AnimationSystem/BlendShapeResource.h>
+#include <RendererCore/Meshes/MeshResourceDescriptor.h>
 
 // clang-format off
 EZ_BEGIN_DYNAMIC_REFLECTED_TYPE(ezBlendShapeAssetDocument, 1, ezRTTINoAllocator)
@@ -43,7 +45,7 @@ void ezBlendShapeAssetDocument::UpdateAssetDocumentInfo(ezAssetDocumentInfo* pIn
   auto pProp = GetProperties();
 
   // Expose blend shape names so components can dynamically reflect them
-  auto pExposedParams = EZ_DEFAULT_NEW(ezExposedParameters);
+  ezExposedParameters* pExposedParams = EZ_DEFAULT_NEW(ezExposedParameters);
   for (const auto& ch : pProp->m_Channels)
   {
     ezExposedParameter* param = EZ_DEFAULT_NEW(ezExposedParameter);

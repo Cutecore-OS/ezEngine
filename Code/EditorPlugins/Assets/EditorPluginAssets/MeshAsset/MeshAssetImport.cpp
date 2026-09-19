@@ -4,6 +4,7 @@
 #include <EditorFramework/Preferences/ProjectPreferences.h>
 #include <EditorPluginAssets/AnimatedMeshAsset/AnimatedMeshAsset.h>
 #include <EditorPluginAssets/AnimationClipAsset/AnimationClipAsset.h>
+#include <EditorPluginAssets/BlendShapeAsset/BlendShapeAsset.h>
 #include <EditorPluginAssets/Dialogs/MeshImportDlg.moc.h>
 #include <EditorPluginAssets/MeshAsset/MeshAsset.h>
 #include <EditorPluginAssets/SkeletonAsset/SkeletonAsset.h>
@@ -383,9 +384,11 @@ ezStatus ezAnimatedMeshAssetDocumentGenerator::ConfigureMeshDocument(ezStringVie
 
         out_generatedDocuments.PushBack(pBSDoc);
 
-        auto pBSPropObj = pBSDoc->GetPropertyObject();
+        ezBlendShapeAssetDocument* pBSAssetDoc = ezDynamicCast<ezBlendShapeAssetDocument*>(pBSDoc);
 
-        ezObjectCommandAccessor ca(pBSDoc->GetCommandHistory());
+        auto pBSPropObj = pBSAssetDoc->GetPropertyObject();
+
+        ezObjectCommandAccessor ca(pBSAssetDoc->GetCommandHistory());
         ca.StartTransaction("Init Values");
         ca.SetValueByName(pBSPropObj, "File", sInputFile).AssertSuccess();
         ca.SetValueByName(pBSPropObj, "PreviewMesh", sAnimMeshGuid.GetView()).AssertSuccess();
