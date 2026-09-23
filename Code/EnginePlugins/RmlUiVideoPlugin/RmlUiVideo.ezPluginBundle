@@ -1,0 +1,9 @@
+PluginInfo
+{
+  string %DisplayName{"RML UI Video"}
+  string %Description{"Displays local videos in RmlUi 2D and 3D canvases using FFmpeg."}
+  string %RuntimePlugins{"ezRmlUiVideoPlugin"}
+  string %RequiredPlugins{"RmlUi"}
+  string %PackageDependencies{"avcodec-*", "avformat-*", "avutil-*", "swscale-*", "swresample-*", "libavcodec*", "libavformat*", "libavutil*", "libswscale*", "libswresample*"}
+  string %CMakeTargetName{"RmlUiVideoPlugin"}
+}
