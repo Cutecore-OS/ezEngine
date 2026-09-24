@@ -1,0 +1,13 @@
+PluginInfo
+{
+  string %DisplayName{"Movies"}
+  string %Description{"Render cinematics with a fixed frame rate and synchronous MiniAudio sound."}
+  string %EditorPlugins{"ezEditorPluginMovies"}
+  string %EditorEnginePlugins{}
+  string %RuntimePlugins{"ezMoviesPlugin"}
+  string %PackageDependencies{}
+  string %RequiredPlugins{"MiniAudio"}
+  string %ExclusiveFeatures{}
+  string %EnabledInTemplates{}
+  string %CMakeTargetName{"MoviesPlugin"}
+}
