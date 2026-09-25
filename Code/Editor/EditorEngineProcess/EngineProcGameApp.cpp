@@ -20,10 +20,6 @@
 #include <RendererCore/RenderContext/RenderContext.h>
 #include <RendererCore/RenderWorld/RenderWorld.h>
 
-#if EZ_ENABLED(EZ_PLATFORM_WINDOWS_DESKTOP)
-#  include <shellscalingapi.h>
-#endif
-
 ezCommandLineOptionPath opt_OutputDir("_EditorEngineProcess", "-outputDir", "Output directory", "");
 ezCommandLineOptionString opt_LogName("_EditorEngineProcess", "-logName", "Log File Prefix", "LogEngine");
 
@@ -42,10 +38,6 @@ static ezAssertHandler g_PreviousAssertHandler = nullptr;
 ezEngineProcessGameApplication::ezEngineProcessGameApplication()
   : ezGameApplication("ezEditorEngineProcess", nullptr)
 {
-#if EZ_ENABLED(EZ_PLATFORM_WINDOWS_DESKTOP)
-  SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
-#endif
-
   m_LongOpWorkerManager.Startup(&m_IPC);
 }
 
@@ -418,7 +410,8 @@ void ezEngineProcessGameApplication::EventHandlerIPC(const ezEngineProcessCommun
       ezStartup::StartupHighLevelSystems();
 
       ezRenderContext::GetDefaultInstance()->SetAllowAsyncShaderLoading(true);
-      ezDebugRenderer::SetTextScale(pMsg->m_fDevicePixelRatio);
+      // what Qt reports for the display that the editor window is on, in place of the window content scale
+      ezRenderWorld::SetDisplayScale(pMsg->m_fDevicePixelRatio);
     }
 
     // after the ezSetupProjectMsgToEngine was processed, all dynamic plugins should be loaded and we can finally send the reflection
@@ -713,17 +706,21 @@ void ezEngineProcessGameApplication::Init_FileSystem_ConfigureDataDirs()
     sUserData = opt_OutputDir.GetOptionValue(ezCommandLineOption::LogMode::AlwaysIfSpecified);
   }
 
+  // project specific, so that saved settings don't leak into other projects, same as MakeApplicationNameProjectSpecific() in ezPlayer
+  ezStringBuilder sAppData = sUserData;
+  sAppData.AppendPath(ezPathUtils::GetFileName(m_sProjectDirectory));
 
   // make sure these directories exist
   ezFileSystem::CreateDirectoryStructure(sAppDir).AssertSuccess();
   ezFileSystem::CreateDirectoryStructure(sUserData).AssertSuccess();
+  ezFileSystem::CreateDirectoryStructure(sAppData).AssertSuccess();
   ezFileSystem::CreateDirectoryStructure(">sdk/Output/").AssertSuccess();
 
   ezFileSystem::AddDataDirectory("", "EngineProcess", ":", ezDataDirUsage::AllowWrites).AssertSuccess();                       // for absolute paths
   ezFileSystem::AddDataDirectory(">appdir/", "EngineProcess", "bin", ezDataDirUsage::ReadOnly).AssertSuccess();                // writing to the binary directory
   ezFileSystem::AddDataDirectory(">sdk/Output/", "EngineProcess", "shadercache", ezDataDirUsage::AllowWrites).AssertSuccess(); // for shader files
   ezFileSystem::AddDataDirectory(sAppDir.GetData(), "EngineProcess", "app").AssertSuccess();                                   // app specific data
-  ezFileSystem::AddDataDirectory(sUserData, "EngineProcess", "appdata", ezDataDirUsage::AllowWrites).AssertSuccess();          // for writing app user data
+  ezFileSystem::AddDataDirectory(sAppData, "EngineProcess", "appdata", ezDataDirUsage::AllowWrites).AssertSuccess();           // for writing app user data
 
   m_CustomFileSystemConfig.Apply();
 
@@ -735,8 +732,13 @@ void ezEngineProcessGameApplication::Init_FileSystem_ConfigureDataDirs()
       sLogName = opt_LogName.GetOptionValue(ezCommandLineOption::LogMode::Never);
     }
     ezOsProcessID uiProcessID = ezProcess::GetCurrentProcessID();
+
+    // not ':appdata', which is project specific
+    ezStringBuilder sLogDir;
+    ezFileSystem::ResolveSpecialDirectory(sUserData, sLogDir).IgnoreResult();
+
     ezStringBuilder sLogFile;
-    sLogFile.SetFormat(":appdata/Logs/{0}_{1}.htm", sLogName, uiProcessID);
+    sLogFile.SetFormat("{0}/Logs/{1}_{2}.htm", sLogDir, sLogName, uiProcessID);
     m_LogHTML.BeginLog(sLogFile, "EditorEngineProcess");
   }
 }
