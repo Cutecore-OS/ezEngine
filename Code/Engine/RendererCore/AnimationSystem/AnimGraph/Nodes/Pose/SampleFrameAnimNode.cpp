@@ -107,6 +107,14 @@ void ezSampleFrameAnimNode::Step(ezAnimController& ref_controller, ezAnimGraphIn
       pLocalTransforms->m_fOverallWeight = 1.0f;
       pLocalTransforms->m_CommandID = cmd.GetCommandID();
 
+      const double fSampleTime = fNormPos * pAnimClip->GetDescriptor().GetDuration().GetSeconds();
+      for (const auto& curve : pAnimClip->GetDescriptor().m_CustomCurves)
+      {
+        auto& value = pLocalTransforms->m_CustomCurveValues.ExpandAndGetRef();
+        value.m_sName = curve.m_sName;
+        value.m_fValue = static_cast<float>(curve.m_Curve.Evaluate(fSampleTime));
+      }
+
       m_OutPose.SetPose(ref_graph, pLocalTransforms);
     }
   }

@@ -215,8 +215,7 @@ namespace ezModelImporter2
     {
       for (ezUInt32 meshIdx = 0; meshIdx < pNode->mNumMeshes; ++meshIdx)
       {
-        const ezStringView sNodeName = pNode->mName.C_Str();
-        EZ_SUCCEED_OR_RETURN(ProcessAiMesh(m_pScene->mMeshes[pNode->mMeshes[meshIdx]], globalTransform, sNodeName));
+        EZ_SUCCEED_OR_RETURN(ProcessAiMesh(m_pScene->mMeshes[pNode->mMeshes[meshIdx]], globalTransform, pNode->mName.C_Str()));
       }
     }
 

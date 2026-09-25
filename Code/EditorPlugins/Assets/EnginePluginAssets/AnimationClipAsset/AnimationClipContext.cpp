@@ -69,6 +69,10 @@ void ezAnimationClipContext::HandleMessage(const ezEditorEngineDocumentMsg* pMsg
     {
       m_sBaseAnimationClip = pMsg->m_sPayload;
     }
+    else if (pMsg->m_sWhatToDo == "BlendShapePreview" && pMsg->m_PayloadValue.IsA<ezVariantDictionary>())
+    {
+      m_PreviewBlendShapeWeights = pMsg->m_PayloadValue.Get<ezVariantDictionary>();
+    }
     else if (pMsg->m_sWhatToDo == "PlaybackPos")
     {
       SetPlaybackPosition(pMsg->m_PayloadValue.Get<double>());
@@ -103,7 +107,7 @@ void ezAnimationClipContext::HandleMessage(const ezEditorEngineDocumentMsg* pMsg
       }
     }
 
-    GenerateAndApplyPose();
+    GenerateAndApplyPose(true);
   }
 
   ezEngineProcessDocumentContext::HandleMessage(pMsg0);
@@ -189,7 +193,7 @@ void ezAnimationClipContext::SetPlaybackPosition(double pos)
   m_fNormalizedPlaybackPosition = static_cast<float>(pos);
 }
 
-void ezAnimationClipContext::GenerateAndApplyPose()
+void ezAnimationClipContext::GenerateAndApplyPose(bool bLivePreview)
 {
   if (m_sAnimatedMeshToUse.IsEmpty() || m_pGameObject == nullptr)
     return;
@@ -255,20 +259,52 @@ void ezAnimationClipContext::GenerateAndApplyPose()
 
   if (!bGraphSetup)
   {
-    // Non-additive mode (or base clip not yet loaded): sample the clip directly.
+    // Without a base clip, additive tracks must be applied to the skeleton rest pose.
     auto& cmdSample = poseGen.AllocCommandSampleTrack(0);
     cmdSample.m_hAnimationClip = hAnimation;
     cmdSample.m_fNormalizedSamplePos = m_fNormalizedPlaybackPosition;
     cmdSample.m_fPreviousNormalizedSamplePos = m_fNormalizedPlaybackPosition;
     cmdSample.m_EventSampling = ezAnimPoseEventTrackSampleMode::None;
 
+    auto poseCommand = cmdSample.GetCommandID();
+    if (pAnimation->GetDescriptor().m_bAdditive)
+    {
+      auto& cmdRest = poseGen.AllocCommandRestPose();
+      auto& cmdCombine = poseGen.AllocCommandCombinePoses();
+      cmdCombine.m_Inputs.PushBack(cmdRest.GetCommandID());
+      cmdCombine.m_InputWeights.PushBack(1.0f);
+      cmdCombine.m_Inputs.PushBack(poseCommand);
+      cmdCombine.m_InputWeights.PushBack(1.0f);
+      poseCommand = cmdCombine.GetCommandID();
+    }
+
     auto& cmdL2M = poseGen.AllocCommandLocalToModelPose();
     cmdL2M.m_pSendLocalPoseMsgTo = m_pGameObject;
-    cmdL2M.m_Inputs.PushBack(cmdSample.GetCommandID());
+    cmdL2M.m_Inputs.PushBack(poseCommand);
     poseGen.SetFinalCommand(cmdL2M.GetCommandID());
   }
 
   poseGen.UpdatePose(false);
+  const double curveTime = pAnimation->GetDescriptor().GetDuration().GetSeconds() * m_fNormalizedPlaybackPosition;
+  for (const auto& curve : pAnimation->GetDescriptor().m_CustomCurves)
+  {
+    ezMsgAnimationCurveValue msg;
+    msg.m_sCurveName = curve.m_sName;
+    msg.m_fAverage = msg.m_fMin = msg.m_fMax = static_cast<float>(curve.m_Curve.Evaluate(curveTime));
+    m_pGameObject->SendMessageRecursive(msg);
+  }
+
+  // Apply unsaved editor weights after the source clip. Thumbnails keep using saved data.
+  if (bLivePreview)
+  {
+    for (auto it = m_PreviewBlendShapeWeights.GetIterator(); it.IsValid(); ++it)
+    {
+      ezMsgAnimationCurveValue msg;
+      msg.m_sCurveName.Assign(it.Key());
+      msg.m_fAverage = msg.m_fMin = msg.m_fMax = it.Value().ConvertTo<float>();
+      m_pGameObject->SendMessageRecursive(msg);
+    }
+  }
 
   if (poseGen.ShouldSendPoseResultMsg())
   {

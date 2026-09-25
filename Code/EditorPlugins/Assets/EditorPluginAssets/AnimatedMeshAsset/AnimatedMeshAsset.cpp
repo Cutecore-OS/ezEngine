@@ -1,6 +1,7 @@
 #include <EditorPluginAssets/EditorPluginAssetsPCH.h>
 
 #include <EditorPluginAssets/AnimatedMeshAsset/AnimatedMeshAsset.h>
+#include <EditorPluginAssets/BlendShapeAsset/BlendShapeAsset.h>
 #include <EditorPluginAssets/Util/MeshImportUtils.h>
 #include <Foundation/Utilities/Progress.h>
 #include <ModelImporter2/ModelImporter.h>
@@ -44,6 +45,7 @@ ezTransformStatus ezAnimatedMeshAssetDocument::InternalTransformAsset(ezStreamWr
     desc.m_hDefaultSkeleton = ezResourceManager::LoadResource<ezSkeletonResource>(pProp->m_sDefaultSkeleton);
   }
 
+  desc.m_sDefaultBlendShapes = pProp->m_sDefaultBlendShapes;
   desc.Save(stream);
 
   ezMeshImportUtils::RecordMeshTransformInfo(GetTransformInfo(), desc);
@@ -73,7 +75,7 @@ ezStatus ezAnimatedMeshAssetDocument::CreateMeshFromFile(ezAnimatedMeshAssetProp
   opt.m_bImportSkinningData = true;
   opt.m_bRecomputeNormals = pProp->m_bRecalculateNormals;
   opt.m_bRecomputeTangents = pProp->m_bRecalculateTangents;
-  opt.m_bHighPrecision = pProp->m_bHighPrecision;
+  opt.m_bHighPrecision = pProp->m_bHighPrecision || !pProp->m_sDefaultBlendShapes.IsEmpty();
   opt.m_MeshVertexColorConversion = pProp->m_VertexColorConversion;
   opt.m_bNormalizeWeights = pProp->m_bNormalizeWeights;
   opt.m_pMeshOutput = &desc;
@@ -110,6 +112,9 @@ ezStatus ezAnimatedMeshAssetDocument::CreateMeshFromFile(ezAnimatedMeshAssetProp
 
   if (pImporter->Import(opt).Failed())
     return ezStatus("Model importer was unable to read this asset.");
+
+  if (!pProp->m_sDefaultBlendShapes.IsEmpty())
+    EZ_SUCCEED_OR_RETURN(ezPrepareBlendShapes(opt, desc));
 
   ezMeshImportUtils::RecordAvailableMeshes(GetTransformInfo(), pImporter.Borrow());
 
@@ -159,6 +164,8 @@ ezTransformStatus ezAnimatedMeshAssetDocument::InternalCreateThumbnail(const Thu
 void ezAnimatedMeshAssetDocument::UpdateAssetDocumentInfo(ezAssetDocumentInfo* pInfo) const
 {
   SUPER::UpdateAssetDocumentInfo(pInfo);
+
+  ezExposeBlendShapes(*this, *pInfo);
 
   // For glTF files, add any referenced external buffer files as dependencies
   ezMeshImportUtils::AddGltfBufferDependencies(GetProperties()->m_sMeshFile, pInfo->m_TransformDependencies);

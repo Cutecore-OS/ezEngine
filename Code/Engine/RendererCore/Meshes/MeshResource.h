@@ -34,6 +34,7 @@ public:
   ezUInt64 GetAssetHash() const { return m_uiAssetHash; }
 
   // TODO: clean up
+  ezString m_sDefaultBlendShapes;      ///< Optional deformation asset owned by the Blend Shapes plugin.
   ezSkeletonResourceHandle m_hDefaultSkeleton;
   ezHashTable<ezHashedString, ezMeshResourceDescriptor::BoneData> m_Bones;
   float m_fMaxBoneVertexOffset = 0.0f; // the maximum distance between any vertex and its influencing bones, can be used for adjusting the bounding box of a pose

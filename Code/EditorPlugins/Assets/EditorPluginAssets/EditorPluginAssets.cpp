@@ -1,4 +1,5 @@
 #include <EditorPluginAssets/EditorPluginAssetsPCH.h>
+#include <EditorPluginAssets/BlendShapeAsset/BlendShapeAsset.h>
 
 #include <EditorFramework/Actions/AssetActions.h>
 #include <EditorFramework/Actions/CameraModeSwitchActions.h>
@@ -449,6 +450,7 @@ void OnLoadPlugin()
   ConfigureAnimationClipAsset();
   ConfigureSkeletonAsset();
   ConfigureAnimatedMeshAsset();
+  ezRegisterBlendShapeActions();
   ConfigureImageDataAsset();
   ConfigureStateMachineAsset();
   ConfigureBlackboardTemplateAsset();
@@ -470,6 +472,7 @@ void OnLoadPlugin()
 
 void OnUnloadPlugin()
 {
+  ezUnregisterBlendShapeActions();
   ezMeshLodActions::UnregisterActions();
   ezTextureAssetActions::UnregisterActions();
   ezLUTAssetActions::UnregisterActions();

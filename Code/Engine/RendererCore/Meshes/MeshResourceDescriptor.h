@@ -84,6 +84,7 @@ public:
     ezResult Deserialize(ezStreamReader& inout_stream);
   };
 
+  ezString m_sDefaultBlendShapes;                ///< Optional deformation asset owned by the Blend Shapes plugin.
   ezSkeletonResourceHandle m_hDefaultSkeleton;   ///< Default skeleton for skinned meshes.
   ezHashTable<ezHashedString, BoneData> m_Bones; ///< Bone data indexed by bone name.
 

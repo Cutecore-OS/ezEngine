@@ -4,6 +4,11 @@
 #include <RendererCore/AnimationSystem/AnimationPose.h>
 #include <RendererCore/Meshes/SkinnedMeshRenderData.h>
 
+struct ezMsgAnimationCurveValue;
+class ezAnimatedMeshComponent;
+
+class ezBlendShapeDeformer;
+
 using ezSkeletonResourceHandle = ezTypedResourceHandle<class ezSkeletonResource>;
 
 class EZ_GAMEENGINE_DLL ezAnimatedMeshComponentManager : public ezComponentManager<class ezAnimatedMeshComponent, ezBlockStorageType::FreeList>
@@ -16,6 +21,7 @@ public:
 
   void Update(const ezWorldModule::UpdateContext& context);
   void AddToUpdateList(ezAnimatedMeshComponent* pComponent);
+  void UpdateDeformers(const ezWorldModule::UpdateContext& context);
 
 private:
   void ResourceEventHandler(const ezResourceEvent& e);
@@ -64,6 +70,10 @@ public:
   ezAnimatedMeshComponent();
   ~ezAnimatedMeshComponent();
 
+  ezBlendShapeDeformer* GetDeformer() const { return m_pDeformer.Borrow(); }
+  void UpdateDeformer();
+  void InvalidateDeformedRenderData() { InvalidateCachedRenderData(); }
+
   void RetrievePose(ezDynamicArray<ezMat4>& out_modelTransforms, ezTransform& out_rootTransform, const ezSkeleton& skeleton);
 
 protected:
@@ -74,6 +84,9 @@ protected:
   void InitializeAnimationPose();
 
   void MapModelSpacePoseToSkinningSpace(const ezHashTable<ezHashedString, ezMeshResourceDescriptor::BoneData>& bones, const ezSkeleton& skeleton, ezArrayPtr<const ezMat4> modelSpaceTransforms, ezBoundingBox* bounds);
+
+  void OnAnimationCurve(ezMsgAnimationCurveValue& msg);
+  ezUniquePtr<ezBlendShapeDeformer> m_pDeformer;
 
   ezTransform m_RootTransform = ezTransform::MakeIdentity();
   ezBoundingBox m_MaxBounds;
