@@ -26,7 +26,7 @@ namespace ezModelImporter2
     ezResult RecomputeTangents();
 
     ezResult TraverseAiNode(aiNode* pNode, const ezMat4& parentTransform, ezEditableSkeletonJoint* pCurJoint);
-    ezResult ProcessAiMesh(aiMesh* pMesh, const ezMat4& transform);
+    ezResult ProcessAiMesh(aiMesh* pMesh, const ezMat4& transform, ezStringView sNode);
 
     ezResult ImportMaterials();
     ezResult ImportAnimations();
@@ -44,6 +44,7 @@ namespace ezModelImporter2
     {
       ezMat4 m_GlobalTransform;
       aiMesh* m_pMesh;
+      ezString m_sNode;
     };
 
     ezMap<ezUInt32, ezHybridArray<MeshInstance, 4>> m_MeshInstances;

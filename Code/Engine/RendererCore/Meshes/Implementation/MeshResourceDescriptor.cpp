@@ -39,6 +39,7 @@ void ezMeshResourceDescriptor::Clear()
 {
   m_Bounds = ezBoundingBoxSphere::MakeInvalid();
   m_hMeshBuffer.Invalidate();
+  m_sDefaultBlendShapes.Clear();
   m_Materials.Clear();
   m_MeshBufferDescriptor.Clear();
   m_SubMeshes.Clear();
@@ -278,6 +279,13 @@ void ezMeshResourceDescriptor::Save(ezStreamWriter& inout_stream)
     chunk.EndChunk();
   }
 
+  if (!m_sDefaultBlendShapes.IsEmpty())
+  {
+    chunk.BeginChunk("DefaultBlendShapes", 1);
+    chunk << m_sDefaultBlendShapes;
+    chunk.EndChunk();
+  }
+
   if (m_hDefaultSkeleton.IsValid())
   {
     chunk.BeginChunk("Skeleton", 1);
@@ -316,6 +324,9 @@ ezResult ezMeshResourceDescriptor::Load(const char* szFile)
 
 ezResult ezMeshResourceDescriptor::Load(ezStreamReader& inout_stream)
 {
+  // Older meshes omit this optional chunk; never retain a previous association.
+  m_sDefaultBlendShapes.Clear();
+
   ezUInt8 uiVersion = 0;
   inout_stream >> uiVersion;
 
@@ -522,6 +533,9 @@ ezResult ezMeshResourceDescriptor::Load(ezStreamReader& inout_stream)
     {
       EZ_SUCCEED_OR_RETURN(chunk.ReadHashTable(m_Bones));
     }
+
+    if (ci.m_sChunkName == "DefaultBlendShapes")
+      chunk >> m_sDefaultBlendShapes;
 
     if (ci.m_sChunkName == "Skeleton")
     {

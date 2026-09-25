@@ -215,7 +215,7 @@ namespace ezModelImporter2
     {
       for (ezUInt32 meshIdx = 0; meshIdx < pNode->mNumMeshes; ++meshIdx)
       {
-        EZ_SUCCEED_OR_RETURN(ProcessAiMesh(m_pScene->mMeshes[pNode->mMeshes[meshIdx]], globalTransform));
+        EZ_SUCCEED_OR_RETURN(ProcessAiMesh(m_pScene->mMeshes[pNode->mMeshes[meshIdx]], globalTransform, pNode->mName.C_Str()));
       }
     }
 

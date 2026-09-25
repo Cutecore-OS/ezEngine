@@ -3,6 +3,7 @@
 #include <EditorFramework/Assets/AssetBrowserDlg.moc.h>
 #include <EditorFramework/Assets/AssetCurator.h>
 #include <EditorPluginAssets/AnimationClipAsset/AnimationClipAsset.h>
+#include <EditorPluginAssets/BlendShapeAsset/BlendShapeAsset.h>
 #include <Foundation/Utilities/AssetInfoFile.h>
 #include <Foundation/Utilities/Progress.h>
 #include <GuiFoundation/PropertyGrid/PropertyMetaState.h>
@@ -19,11 +20,12 @@ EZ_BEGIN_STATIC_REFLECTED_ENUM(ezRootMotionSource, 1)
   EZ_ENUM_CONSTANTS(ezRootMotionSource::None, ezRootMotionSource::Constant)
 EZ_END_STATIC_REFLECTED_ENUM;
 
-EZ_BEGIN_DYNAMIC_REFLECTED_TYPE(ezAnimationClipCurveData, 1, ezRTTIDefaultAllocator<ezAnimationClipCurveData>)
+EZ_BEGIN_DYNAMIC_REFLECTED_TYPE(ezAnimationClipCurveData, 2, ezRTTIDefaultAllocator<ezAnimationClipCurveData>)
 {
   EZ_BEGIN_PROPERTIES
   {
     EZ_MEMBER_PROPERTY("Name", m_sName)->AddAttributes(new ezDynamicStringEnumAttribute("CustomAnimCurveNames")),
+    EZ_MEMBER_PROPERTY("OverrideSource", m_bOverrideSource),
     EZ_MEMBER_PROPERTY("Curve", m_Curve)->AddAttributes(new ezHiddenAttribute()),
   }
   EZ_END_PROPERTIES;
@@ -34,12 +36,12 @@ EZ_BEGIN_STATIC_REFLECTED_ENUM(ezAdditiveAnimationReference, 1)
   EZ_ENUM_CONSTANTS(ezAdditiveAnimationReference::FirstKeyFrame, ezAdditiveAnimationReference::LastKeyFrame)
 EZ_END_STATIC_REFLECTED_ENUM;
 
-EZ_BEGIN_DYNAMIC_REFLECTED_TYPE(ezAnimationClipAssetProperties, 4, ezRTTIDefaultAllocator<ezAnimationClipAssetProperties>)
+EZ_BEGIN_DYNAMIC_REFLECTED_TYPE(ezAnimationClipAssetProperties, 5, ezRTTIDefaultAllocator<ezAnimationClipAssetProperties>)
 {
   EZ_BEGIN_PROPERTIES
   {
     EZ_MEMBER_PROPERTY("File", m_sSourceFile)->AddAttributes(new ezFileBrowserAttribute("Select Animation", ezFileBrowserAttribute::MeshesWithAnimations), new ezRequiredAttribute()),
-    EZ_MEMBER_PROPERTY("PreviewMesh", m_sPreviewMesh)->AddAttributes(new ezAssetBrowserAttribute("CompatibleAsset_Mesh_Skinned", ezDependencyFlags::Thumbnail)),
+    EZ_MEMBER_PROPERTY("PreviewMesh", m_sPreviewMesh)->AddAttributes(new ezAssetBrowserAttribute("CompatibleAsset_Mesh_Skinned", ezDependencyFlags::Transform | ezDependencyFlags::Thumbnail)),
     // \see ezAnimationClipAssetDocument::OnRefreshDynamicStringEnum()
     EZ_MEMBER_PROPERTY("UseAnimationClip", m_sAnimationClipToExtract)->AddAttributes(new ezDynamicStringEnumAttribute("AnimationClipsInSourceFile")),
     EZ_MEMBER_PROPERTY("FirstFrame", m_uiFirstFrame),
@@ -52,13 +54,15 @@ EZ_BEGIN_DYNAMIC_REFLECTED_TYPE(ezAnimationClipAssetProperties, 4, ezRTTIDefault
     EZ_MEMBER_PROPERTY("RootMotionDistance", m_fConstantRootMotionLength),
     EZ_MEMBER_PROPERTY("AdjustScale", m_fAnimationPositionScale)->AddAttributes(new ezDefaultValueAttribute(1.0f), new ezClampValueAttribute(0.0001f, 10000.0f), new ezGroupAttribute("Adjustments")),
     EZ_ARRAY_MEMBER_PROPERTY("Curves", m_Curves),
+    EZ_MEMBER_PROPERTY("ImportBlendShapes", m_bImportBlendShapes)->AddAttributes(new ezDefaultValueAttribute(true)),
+    EZ_ARRAY_MEMBER_PROPERTY("BlendShapes", m_BlendShapes)->AddAttributes(new ezContainerAttribute(false, false, false)),
     EZ_MEMBER_PROPERTY("EventTrack", m_EventTrack)->AddAttributes(new ezHiddenAttribute()),
   }
   EZ_END_PROPERTIES;
 }
 EZ_END_DYNAMIC_REFLECTED_TYPE;
 
-EZ_BEGIN_DYNAMIC_REFLECTED_TYPE(ezAnimationClipAssetDocument, 7, ezRTTINoAllocator)
+EZ_BEGIN_DYNAMIC_REFLECTED_TYPE(ezAnimationClipAssetDocument, 8, ezRTTINoAllocator)
 EZ_END_DYNAMIC_REFLECTED_TYPE;
 // clang-format on
 
@@ -98,6 +102,14 @@ void ezAnimationClipAssetDocument::OnRefreshDynamicStringEnum(ezDynamicStringEnu
 
 void ezAnimationClipAssetProperties::PropertyMetaStateEventHandler(ezPropertyMetaStateEvent& e)
 {
+  if (e.m_pObject->GetTypeAccessor().GetType() == ezGetStaticRTTI<ezAnimationClipCurveData>())
+  {
+    if (e.m_pObject->GetParentProperty() == "BlendShapes")
+      (*e.m_pPropertyStates)["Name"].m_Visibility = ezPropertyUiState::Disabled;
+    (*e.m_pPropertyStates)["OverrideSource"].m_Visibility = e.m_pObject->GetParentProperty() == "BlendShapes" ? ezPropertyUiState::Default : ezPropertyUiState::Invisible;
+    return;
+  }
+
   if (e.m_pObject->GetTypeAccessor().GetType() != ezGetStaticRTTI<ezAnimationClipAssetProperties>())
     return;
 
@@ -211,6 +223,11 @@ ezTransformStatus ezAnimationClipAssetDocument::InternalTransformAsset(ezStreamW
       pProp->m_Curves[i].m_Curve.ConvertToRuntimeData(desc.m_CustomCurves[i].m_Curve);
       desc.m_CustomCurves[i].m_Curve.SortControlPoints();
       desc.m_CustomCurves[i].m_Curve.CreateLinearApproximation();
+    }
+
+    {
+      EZ_SUCCEED_OR_RETURN(ezTransformBlendShapeCurves(*this, sAbsFilename, desc, transformFlags.IsSet(ezTransformFlags::BackgroundProcessing)));
+      pProp = GetProperties();
     }
 
     range.BeginNextStep("Writing Result");
@@ -424,4 +441,82 @@ ezStatus ezAnimationClipAssetDocumentGenerator::Generate(ezStringView sInputFile
 
   EZ_ASSERT_NOT_IMPLEMENTED;
   return ezStatus(EZ_FAILURE);
+}
+
+ezStatus ezAnimationClipAssetDocument::RefreshBlendShapeCurves()
+{
+  const auto* properties = GetProperties();
+  ezAnimationClipResourceDescriptor clip;
+  clip.SetDuration(ezTime::MakeFromSeconds(1));
+  ezStringBuilder source = properties->m_sSourceFile;
+  if (!source.IsEmpty())
+  {
+    if (!source.IsAbsolutePath() && !ezQtEditorApp::GetSingleton()->MakeDataDirectoryRelativePathAbsolute(source))
+      return ezStatus("Cannot resolve the animation source.");
+    auto importer = ezModelImporter2::RequestImporterForFileType(source);
+    if (importer == nullptr)
+      return ezStatus("No importer for the animation source.");
+    ezModelImporter2::ImportOptions options;
+    options.m_sSourceFile = source;
+    options.m_pAnimationOutput = &clip;
+    options.m_sAnimationToImport = properties->m_sAnimationClipToExtract;
+    options.m_uiFirstAnimKeyframe = properties->m_uiFirstFrame;
+    options.m_uiNumAnimKeyframes = properties->m_uiNumFrames;
+    if (importer->Import(options).Failed())
+    {
+      // A model may have shapes but no animation yet. Its Preview Mesh must still
+      // expose those names while the user configures the clip's animation source.
+      if (properties->m_sPreviewMesh.IsEmpty())
+        return ezStatus("Could not read the animation source.");
+      source.Clear();
+      double duration = 1.0;
+      for (const auto& curve : properties->m_BlendShapes)
+        for (const auto& point : curve.m_Curve.m_ControlPoints)
+          duration = ezMath::Max(duration, point.GetTickAsTime().GetSeconds());
+      clip.SetDuration(ezTime::MakeFromSeconds(duration));
+    }
+  }
+  const auto status = ezTransformBlendShapeCurves(*this, source, clip, false);
+  return status.Succeeded() ? ezStatus(EZ_SUCCESS) : ezStatus(status.m_sMessage.GetView());
+}
+
+void ezAnimationClipAssetDocument::SetBlendShapeCurves(const ezDynamicArray<ezAnimationClipCurveData>& curves)
+{
+  auto* accessor = GetObjectAccessor();
+  accessor->StartTransaction("Update imported blend shape curves");
+  auto resize = [&](const ezDocumentObject* parent, const char* property, ezUInt32 count, const ezRTTI* type)
+  {
+    while (parent->GetTypeAccessor().GetCount(property) > static_cast<ezInt32>(count))
+    {
+      const auto guid = parent->GetTypeAccessor().GetValue(property, parent->GetTypeAccessor().GetCount(property) - 1).Get<ezUuid>();
+      accessor->RemoveObject(accessor->GetObject(guid)).AssertSuccess();
+    }
+    while (parent->GetTypeAccessor().GetCount(property) < static_cast<ezInt32>(count))
+    {
+      ezUuid guid;
+      accessor->AddObjectByName(parent, property, -1, type, guid).AssertSuccess();
+    }
+  };
+  resize(GetPropertyObject(), "BlendShapes", curves.GetCount(), ezGetStaticRTTI<ezAnimationClipCurveData>());
+  for (ezUInt32 i = 0; i < curves.GetCount(); ++i)
+  {
+    const auto* namedCurve = accessor->GetObject(GetPropertyObject()->GetTypeAccessor().GetValue("BlendShapes", i).Get<ezUuid>());
+    accessor->SetValueByName(namedCurve, "Name", curves[i].m_sName).AssertSuccess();
+    accessor->SetValueByName(namedCurve, "OverrideSource", curves[i].m_bOverrideSource).AssertSuccess();
+    const auto* curve = accessor->GetObject(namedCurve->GetTypeAccessor().GetValue("Curve").Get<ezUuid>());
+    const auto& keys = curves[i].m_Curve.m_ControlPoints;
+    resize(curve, "ControlPoints", keys.GetCount(), ezGetStaticRTTI<ezCurveControlPointData>());
+    for (ezUInt32 k = 0; k < keys.GetCount(); ++k)
+    {
+      const auto* point = accessor->GetObject(curve->GetTypeAccessor().GetValue("ControlPoints", k).Get<ezUuid>());
+      accessor->SetValueByName(point, "Tick", keys[k].m_iTick).AssertSuccess();
+      accessor->SetValueByName(point, "Value", keys[k].m_fValue).AssertSuccess();
+      accessor->SetValueByName(point, "LeftTangent", keys[k].m_LeftTangent).AssertSuccess();
+      accessor->SetValueByName(point, "RightTangent", keys[k].m_RightTangent).AssertSuccess();
+      accessor->SetValueByName(point, "LeftTangentMode", keys[k].m_LeftTangentMode.GetValue()).AssertSuccess();
+      accessor->SetValueByName(point, "RightTangentMode", keys[k].m_RightTangentMode.GetValue()).AssertSuccess();
+      accessor->SetValueByName(point, "Linked", keys[k].m_bTangentsLinked).AssertSuccess();
+    }
+  }
+  accessor->FinishTransaction();
 }

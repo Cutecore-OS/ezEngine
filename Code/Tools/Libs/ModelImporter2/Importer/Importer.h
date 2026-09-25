@@ -10,6 +10,7 @@ class ezProgress;
 class ezEditableSkeleton;
 class ezMeshResourceDescriptor;
 struct ezAnimationClipResourceDescriptor;
+struct aiMesh;
 
 namespace ezModelImporter2
 {
@@ -40,6 +41,11 @@ namespace ezModelImporter2
     ezDynamicArray<ezString> m_MeshExcludeTags;
 
     ezMeshResourceDescriptor* m_pMeshOutput = nullptr;
+
+    /// Optional importer extension for vertex-aligned data. Called before the final vertex fetch remap.
+    ezDelegate<ezResult(const aiMesh&, ezStringView, const ezMat4&, ezUInt32)> m_AssimpMeshImported;
+    /// Old vertex index -> new vertex index, applied to every vertex stream by the importer.
+    ezDelegate<void(ezArrayPtr<const ezUInt32>)> m_VertexRemapped;
 
     ezEditableSkeleton* m_pSkeletonOutput = nullptr;
 

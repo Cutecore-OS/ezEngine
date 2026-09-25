@@ -1,4 +1,5 @@
 #pragma once
+#include <EditorPluginAssets/EditorPluginAssetsDLL.h>
 
 #include <EditorFramework/Assets/AssetDocumentGenerator.h>
 #include <EditorFramework/Assets/SimpleAssetDocument.h>
@@ -7,7 +8,7 @@
 class ezMeshResourceDescriptor;
 class ezMaterialAssetDocument;
 
-class ezAnimatedMeshAssetDocument : public ezSimpleAssetDocument<ezAnimatedMeshAssetProperties>
+class EZ_EDITORPLUGINASSETS_DLL ezAnimatedMeshAssetDocument : public ezSimpleAssetDocument<ezAnimatedMeshAssetProperties>
 {
   EZ_ADD_DYNAMIC_REFLECTION(ezAnimatedMeshAssetDocument, ezSimpleAssetDocument<ezAnimatedMeshAssetProperties>);
 

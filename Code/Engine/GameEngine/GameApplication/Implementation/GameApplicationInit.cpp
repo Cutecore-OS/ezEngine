@@ -1,4 +1,5 @@
 #include <GameEngine/GameEnginePCH.h>
+#include <RendererCore/AnimationSystem/BlendShapeResource.h>
 
 #include <Core/Collection/CollectionResource.h>
 #include <Core/Curves/ColorGradientResource.h>
@@ -71,6 +72,7 @@ void ezGameApplication::Init_ConfigureAssetManagement()
   ezResourceManager::RegisterResourceForAssetType("Render Target", ezGetStaticRTTI<ezTexture2DResource>());
   ezResourceManager::RegisterResourceForAssetType("Shader", ezGetStaticRTTI<ezShaderResource>());
   ezResourceManager::RegisterResourceForAssetType("Skeleton", ezGetStaticRTTI<ezSkeletonResource>());
+  ezResourceManager::RegisterResourceForAssetType("Blend Shapes", ezGetStaticRTTI<ezBlendShapeResource>());
   ezResourceManager::RegisterResourceForAssetType("StateMachine", ezGetStaticRTTI<ezStateMachineResource>());
   ezResourceManager::RegisterResourceForAssetType("Substance Texture", ezGetStaticRTTI<ezTexture2DResource>());
   ezResourceManager::RegisterResourceForAssetType("Surface", ezGetStaticRTTI<ezSurfaceResource>());

@@ -161,6 +161,7 @@ void ezSwitchPoseAnimNode::Step(ezAnimController& ref_controller, ezAnimGraphIns
     pLocalTransforms->m_fOverallWeight = pDataToForward->m_fOverallWeight;
     pLocalTransforms->m_vRootMotion = pDataToForward->m_vRootMotion;
     pLocalTransforms->m_bUseRootMotion = pDataToForward->m_bUseRootMotion;
+    pLocalTransforms->m_CustomCurveValues = pDataToForward->m_CustomCurveValues;
 
     m_OutPose.SetPose(ref_graph, pLocalTransforms);
   }
@@ -180,11 +181,15 @@ void ezSwitchPoseAnimNode::Step(ezAnimController& ref_controller, ezAnimGraphIns
     const bool bPose1UseRootMotion = pPose1->m_bUseRootMotion;
     const ezVec3 vPose0RootMotion = pPose0->m_vRootMotion;
     const ezVec3 vPose1RootMotion = pPose1->m_vRootMotion;
+    const auto curves0 = pPose0->m_CustomCurveValues;
+    const auto curves1 = pPose1->m_CustomCurveValues;
 
     ezAnimGraphPinDataLocalTransforms* pPinData = ref_controller.AddPinDataLocalTransforms();
 
     const float fLerp0 = (float)ezMath::Clamp(pInstance->m_TransitionTime.GetSeconds() / m_TransitionDuration.GetSeconds(), 0.0, 1.0);
     const float fLerp = static_cast<float>(ezMath::GetCurveValue_EaseInOutCubic(fLerp0));
+
+    ezBlendAnimationCurves(curves0, curves1, fLerp, pPinData->m_CustomCurveValues);
 
     auto& cmd = ref_controller.GetPoseGenerator().AllocCommandCombinePoses();
     cmd.m_InputWeights.SetCount(2);

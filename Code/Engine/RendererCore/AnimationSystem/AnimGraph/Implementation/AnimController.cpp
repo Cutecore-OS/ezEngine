@@ -451,3 +451,34 @@ void ezAnimController::SetAnimationClipInfo(const ezHashedString& sClipName, con
 {
   m_AnimationClipMapping[sClipName] = info;
 }
+
+void ezBlendAnimationCurves(ezArrayPtr<const ezAnimGraphCustomCurveData> a, ezArrayPtr<const ezAnimGraphCustomCurveData> b,
+  float fLerp, ezSmallArray<ezAnimGraphCustomCurveData, 2>& out_curves)
+{
+  out_curves.Clear();
+  for (const auto& curve : a)
+  {
+    auto& output = out_curves.ExpandAndGetRef();
+    output.m_sName = curve.m_sName;
+    output.m_fValue = curve.m_fValue * (1.0f - fLerp);
+  }
+  for (const auto& curve : b)
+  {
+    ezAnimGraphCustomCurveData* pOutput = nullptr;
+    for (auto& output : out_curves)
+    {
+      if (output.m_sName == curve.m_sName)
+      {
+        pOutput = &output;
+        break;
+      }
+    }
+    if (pOutput == nullptr)
+    {
+      pOutput = &out_curves.ExpandAndGetRef();
+      pOutput->m_sName = curve.m_sName;
+      pOutput->m_fValue = 0;
+    }
+    pOutput->m_fValue += curve.m_fValue * fLerp;
+  }
+}

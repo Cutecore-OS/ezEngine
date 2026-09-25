@@ -105,11 +105,14 @@ void ezLerpPosesAnimNode::Step(ezAnimController& ref_controller, ezAnimGraphInst
     // which would invalidate any pointer previously obtained from it.
     ezAnimGraphPinDataLocalTransforms* pLocalTransforms = ref_controller.AddPinDataLocalTransforms();
     ezAnimGraphPinDataLocalTransforms* pDataToForward = pPinToForward->GetPose(ref_controller, ref_graph);
+    if (pDataToForward == nullptr)
+      return;
     pLocalTransforms->m_CommandID = pDataToForward->m_CommandID;
     pLocalTransforms->m_pWeights = pDataToForward->m_pWeights;
     pLocalTransforms->m_fOverallWeight = pDataToForward->m_fOverallWeight;
     pLocalTransforms->m_vRootMotion = pDataToForward->m_vRootMotion;
     pLocalTransforms->m_bUseRootMotion = pDataToForward->m_bUseRootMotion;
+    pLocalTransforms->m_CustomCurveValues = pDataToForward->m_CustomCurveValues;
 
     m_OutPose.SetPose(ref_graph, pLocalTransforms);
   }
@@ -121,6 +124,11 @@ void ezLerpPosesAnimNode::Step(ezAnimController& ref_controller, ezAnimGraphInst
 
     auto pPose0 = pPins[(ezInt32)ezMath::Trunc(fIndex)]->GetPose(ref_controller, ref_graph);
     auto pPose1 = pPins[(ezInt32)ezMath::Trunc(fIndex) + 1]->GetPose(ref_controller, ref_graph);
+
+    if (pPose0 == nullptr || pPose1 == nullptr)
+      return;
+
+    ezBlendAnimationCurves(pPose0->m_CustomCurveValues, pPose1->m_CustomCurveValues, fLerp, pPinData->m_CustomCurveValues);
 
     auto& cmd = ref_controller.GetPoseGenerator().AllocCommandCombinePoses();
     cmd.m_InputWeights.SetCount(2);

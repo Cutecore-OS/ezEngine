@@ -5,6 +5,8 @@ EZ_STATICLINK_LIBRARY(GameEngine)
   if (bReturn)
     return;
 
+  EZ_STATICLINK_REFERENCE(GameEngine_Animation_Skeletal_Implementation_BlendShapeComponent);
+
   EZ_STATICLINK_REFERENCE(GameEngine_AI_Implementation_SensorComponent);
   EZ_STATICLINK_REFERENCE(GameEngine_Animation_Implementation_ColorAnimationComponent);
   EZ_STATICLINK_REFERENCE(GameEngine_Animation_Implementation_FollowSplineComponent);

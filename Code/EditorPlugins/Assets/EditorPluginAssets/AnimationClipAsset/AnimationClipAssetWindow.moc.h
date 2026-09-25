@@ -1,5 +1,7 @@
 #pragma once
 
+class QListWidget;
+
 #include <EditorEngineProcessFramework/EngineProcess/ViewRenderSettings.h>
 #include <EditorFramework/DocumentWindow/EngineDocumentWindow.moc.h>
 #include <EditorPluginAssets/AnimationClipAsset/AnimationClipAsset.h>
@@ -68,6 +70,10 @@ private:
   void QueryObjectBBox(ezInt32 iPurpose = 0);
   void UpdateEventTrackEditor();
   void UpdateCurveEditor();
+  void ScheduleBlendShapeRefresh();
+  void BlendShapePropertyEventHandler(const ezDocumentObjectPropertyEvent& e);
+  bool m_bBlendShapeRefreshPending = false;
+  const char* GetEditedCurveProperty() const;
 
   ezClock m_Clock;
   ezEngineViewConfig m_ViewConfig;
@@ -82,4 +88,10 @@ private:
   ezQtDocumentPanel* m_pCurveEditPanel = nullptr;
   ezQtCurve1DEditorWidget* m_pCurveEditor = nullptr;
   ezCurveGroupData m_Curves;
+  ezQtDocumentPanel* m_pBlendShapePanel = nullptr;
+  ezQtCurve1DEditorWidget* m_pBlendShapeEditor = nullptr;
+  ezCurveGroupData m_BlendShapeCurves;
+  ezDynamicArray<ezCurve1D> m_BlendShapePreviewCurves;
+  QListWidget* m_pCurveNames = nullptr;
+  QListWidget* m_pBlendShapeNames = nullptr;
 };

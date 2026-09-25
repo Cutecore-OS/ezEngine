@@ -53,6 +53,10 @@ struct ezAnimGraphPinDataLocalTransforms
   ezSmallArray<ezAnimGraphCustomCurveData, 2> m_CustomCurveValues;
 };
 
+/// Blends named curves, treating a missing curve as zero. Output must not alias either input.
+EZ_RENDERERCORE_DLL void ezBlendAnimationCurves(ezArrayPtr<const ezAnimGraphCustomCurveData> a, ezArrayPtr<const ezAnimGraphCustomCurveData> b,
+  float fLerp, ezSmallArray<ezAnimGraphCustomCurveData, 2>& out_curves);
+
 /// Runtime data for model pose pins, containing bone transforms in model space (relative to skeleton root).
 ///
 /// Model poses are the output after forward kinematics has been applied, ready for final rendering.

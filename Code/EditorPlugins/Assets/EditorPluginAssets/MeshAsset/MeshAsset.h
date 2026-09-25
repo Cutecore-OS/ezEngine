@@ -55,6 +55,7 @@ protected:
   bool m_bShowImportDlg = true;
   static bool s_bReuseSkeleton;
   static bool s_bImportAllClips;
+  static bool s_bImportBlendShapes;
   static bool s_bUseSharedMaterials;
   static bool s_bCreateMaterials;
   static bool s_bAddLODs;
