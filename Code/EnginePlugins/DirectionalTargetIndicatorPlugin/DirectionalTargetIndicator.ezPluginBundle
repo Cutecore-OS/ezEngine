@@ -1,0 +1,8 @@
+PluginInfo
+{
+  string %DisplayName{"Directional Target Indicator"}
+  string %Description{"Screen-space target markers and layered directional indicators at the screen edges."}
+  string %RuntimePlugins{"ezDirectionalTargetIndicatorPlugin"}
+  string %DataDirectories{">sdk/Data/Plugins/DirectionalTargetIndicatorPlugin"}
+  string %CMakeTargetName{"DirectionalTargetIndicatorPlugin"}
+}

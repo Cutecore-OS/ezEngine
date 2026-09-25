@@ -1,0 +1,5 @@
+<RCC>
+  <qresource prefix="TypeIcons">
+    <file>ezSpringBoneComponent.svg</file>
+  </qresource>
+</RCC>

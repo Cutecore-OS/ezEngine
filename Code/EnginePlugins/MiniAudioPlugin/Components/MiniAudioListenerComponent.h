@@ -2,7 +2,7 @@
 
 #include <Core/World/Component.h>
 #include <Core/World/ComponentManager.h>
-#include <MiniAudioPlugin/MiniAudioPluginDLL.h>
+#include <MiniAudioPlugin/Effects/MiniAudioEffect.h>
 
 class ezMiniAudioListenerComponentManager : public ezComponentManager<class ezMiniAudioListenerComponent, ezBlockStorageType::Compact>
 {
@@ -36,6 +36,11 @@ public:
   ezMiniAudioListenerComponent();
   ~ezMiniAudioListenerComponent();
 
+  ezDynamicArray<ezMiniAudioGroupEffect> m_Effects;
+  bool m_bDucker = false;
+  ezDynamicArray<ezMiniAudioDucker> m_Duckers;
+
 protected:
+  virtual void OnDeactivated() override;
   void Update();
 };

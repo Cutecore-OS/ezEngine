@@ -1,0 +1,334 @@
+// ============================================================================
+// ToonShader.ezShader — Complete Anime Toon Material for ezEngine
+//
+// All shading computed in GetEmissiveColor(). PBR BRDF is suppressed
+// (GetBaseColor=0, GetRoughness=1, GetMetallic=0).
+//
+// Light direction convention: matches user's original working shader.
+// Manual LightDirection parameter is TOWARD the light source.
+// ============================================================================
+
+[PLATFORMS]
+ALL
+
+[PERMUTATIONS]
+
+BLEND_MODE
+RENDER_PASS
+SHADING_MODE
+TWO_SIDED
+FLIP_WINDING
+FORWARD_PASS_WRITE_DEPTH
+MSAA
+CAMERA_MODE
+SHADING_QUALITY
+VERTEX_SKINNING
+
+[MATERIALPARAMETER]
+
+Permutation BLEND_MODE;
+Permutation SHADING_MODE;
+Permutation TWO_SIDED;
+
+// ===== BASE =====
+Color BaseColor @Default(Color(1.0, 1.0, 1.0));
+bool UseBaseTexture;
+Texture2D BaseTexture;
+float MaskThreshold @Default(0.25) @Clamp(0.0, 1.0);
+Texture2D DitherNoiseTexture @Default("{ ac614d7c-2b31-4a7b-aa0c-c5d8200b7b89 }");
+
+bool UseNormalTexture;
+Texture2D NormalTexture;
+
+// ===== LIGHT =====
+// @brief Direction TOWARD the light source (world space).
+// @default (0.5, 1.0, 0.5)
+float3 LightDirection @Default(float3(0.5, 1.0, 0.5));
+
+// ===== TOON DIFFUSE =====
+Color ShadowColor @Default(Color(0.6, 0.6, 0.7));
+float ShadowThreshold @Default(0.5) @Clamp(0.0, 1.0);
+float ShadowFeather @Default(0.02) @Clamp(0.0, 1.0);
+
+// ===== RIM =====
+Color RimColor @Default(Color(1.0, 1.0, 1.0));
+float RimPower @Default(4.0) @Clamp(0.1, 10.0);
+float RimIntensity @Default(1.0) @Clamp(0.0, 5.0);
+
+// ===== SPECULAR =====
+Color SpecColor @Default(Color(1.0, 1.0, 1.0));
+float SpecPower @Default(64.0) @Clamp(4.0, 512.0);
+float SpecularThreshold @Default(0.8) @Clamp(0.0, 1.0);
+float SpecularSoftness @Default(0.1) @Clamp(0.0, 1.0);
+float SpecularIntensity @Default(1.0) @Clamp(0.0, 5.0);
+
+// ===== OUTLINE =====
+Color OutlineColor @Default(Color(0.0, 0.0, 0.0));
+float OutlineWidth @Default(0.3) @Clamp(0.0, 1.0);
+
+// ===== BACKLIGHT =====
+bool UseBacklight;
+Color BacklightRimColor @Default(Color(1.0, 0.7, 0.3));
+bool BacklightRimMixBase @Default(true);
+float BacklightRimIntensity @Default(1.5) @Clamp(0.0, 5.0);
+float BacklightRimPower @Default(2.5) @Clamp(0.5, 8.0);
+Color BacklightOutlineColor @Default(Color(1.0, 0.7, 0.3));
+bool BacklightOutlineMixBase @Default(false);
+float BacklightOutlineIntensity @Default(1.0) @Clamp(0.0, 5.0);
+float BacklightOutlineExpand @Default(0.15) @Clamp(0.0, 0.5);
+float BacklightThreshold @Default(0.1) @Clamp(0.0, 1.0);
+
+// ===== EMISSION =====
+float EmissionMultiplier @Default(1.0) @Clamp(0.0, 20.0);
+
+
+[MATERIALCONFIG]
+#include <Shaders/Materials/MaterialConfig.h>
+
+[RENDERSTATE]
+#include <Shaders/Materials/MaterialState.h>
+
+[MATERIALCONSTANTS]
+
+COLOR4F(BaseColor);
+COLOR4F(ShadowColor);
+COLOR4F(RimColor);
+COLOR4F(SpecColor);
+COLOR4F(OutlineColor);
+COLOR4F(BacklightRimColor);
+COLOR4F(BacklightOutlineColor);
+
+FLOAT1(MaskThreshold);
+FLOAT1(ShadowThreshold);
+FLOAT1(ShadowFeather);
+FLOAT1(RimPower);
+FLOAT1(RimIntensity);
+FLOAT1(SpecPower);
+FLOAT1(SpecularThreshold);
+FLOAT1(SpecularSoftness);
+FLOAT1(SpecularIntensity);
+FLOAT1(OutlineWidth);
+FLOAT1(EmissionMultiplier);
+FLOAT1(BacklightRimIntensity);
+FLOAT1(BacklightOutlineIntensity);
+FLOAT1(BacklightOutlineExpand);
+FLOAT1(BacklightRimPower);
+FLOAT1(BacklightThreshold);
+
+FLOAT3(LightDirection);
+
+BOOL1(UseBaseTexture);
+BOOL1(UseNormalTexture);
+BOOL1(UseBacklight);
+BOOL1(BacklightRimMixBase);
+BOOL1(BacklightOutlineMixBase);
+
+
+// =====================================================================
+//  VERTEX SHADER
+// =====================================================================
+[SHADER]
+
+#define USE_NORMAL
+#define USE_TANGENT
+#define USE_TEXCOORD0
+#define USE_TWO_SIDED_LIGHTING
+
+#if RENDER_PASS == RENDER_PASS_EDITOR
+  #define USE_DEBUG_INTERPOLATOR
+#endif
+
+[VERTEXSHADER]
+
+#if VERTEX_SKINNING
+  #define USE_SKINNING
+#endif
+
+#include <Shaders/Materials/MaterialVertexShader.h>
+
+VS_OUT main(VS_IN Input)
+{
+  return FillVertexData(Input);
+}
+
+
+// =====================================================================
+//  PIXEL SHADER
+// =====================================================================
+[PIXELSHADER]
+
+#define USE_SIMPLE_MATERIAL_MODEL
+#define USE_MATERIAL_EMISSIVE
+#define USE_MATERIAL_OCCLUSION
+#define USE_DECALS
+#define USE_FOG
+#define USE_CUSTOM_DITHER_NOISE
+
+#include <Shaders/Materials/MaterialPixelShader.h>
+
+Texture2D BaseTexture BIND_GROUP(BG_MATERIAL);
+SamplerState BaseTexture_AutoSampler BIND_GROUP(BG_MATERIAL);
+
+Texture2D NormalTexture BIND_GROUP(BG_MATERIAL);
+SamplerState NormalTexture_AutoSampler BIND_GROUP(BG_MATERIAL);
+
+Texture2D DitherNoiseTexture BIND_GROUP(BG_MATERIAL);
+
+// ===== Standard pipeline hooks =====
+
+float3 GetNormal()
+{
+  [branch]
+  if (GetMaterialData(UseNormalTexture))
+  {
+    float3 normalTS = DecodeNormalTexture(NormalTexture.Sample(NormalTexture_AutoSampler, G.Input.TexCoord0.xy));
+    return TangentToWorldSpace(normalTS);
+  }
+  return G.Input.Normal;
+}
+
+float3 GetBaseColor()   { return float3(0, 0, 0); }
+float  GetMetallic()    { return 0.0f; }
+float  GetReflectance() { return 0.0f; }
+float  GetRoughness()   { return 1.0f; }
+float  GetOcclusion()   { return 1.0f; }
+
+float GetOpacity()
+{
+  #if BLEND_MODE == BLEND_MODE_MASKED
+    float opacity = GetMaterialData(BaseColor).a * GetInstanceData().Color.a;
+    [branch]
+    if (GetMaterialData(UseBaseTexture))
+      opacity *= BaseTexture.Sample(BaseTexture_AutoSampler, G.Input.TexCoord0.xy).a;
+    return opacity - GetMaterialData(MaskThreshold);
+  #else
+    return 1.0f;
+  #endif
+}
+
+float4 GetDitherNoise(float2 pixelCoord)
+{
+  uint2 s;
+  DitherNoiseTexture.GetDimensions(s.x, s.y);
+  return DitherNoiseTexture.SampleLevel(PointSampler, pixelCoord / s, 0);
+}
+
+
+// =====================================================================
+//  TOON EMISSIVE — all shading logic here
+// =====================================================================
+float3 GetEmissiveColor()
+{
+  // ---- Albedo ----
+  float3 albedo = GetMaterialData(BaseColor).rgb * GetInstanceData().Color.rgb;
+  [branch]
+  if (GetMaterialData(UseBaseTexture))
+    albedo *= BaseTexture.Sample(BaseTexture_AutoSampler, G.Input.TexCoord0.xy).rgb;
+
+  float3 N = normalize(GetNormal());
+  float3 V = normalize(GetCameraPosition() - G.Input.WorldPosition);
+
+  // ---- Light direction ----
+  // Manual parameter: user sets direction TOWARD the light source.
+  // This matches the original working toon shader convention.
+  float3 L = normalize(GetMaterialData(LightDirection));
+
+  // ================================================================
+  //  TOON DIFFUSE
+  // ================================================================
+  float NdotL = dot(N, L);
+
+  #if defined(USE_TWO_SIDED_LIGHTING)
+    NdotL = G.Input.FrontFace ? NdotL : -NdotL;
+  #endif
+
+  float halfLambert = NdotL * 0.5 + 0.5;
+  float shadowW = smoothstep(
+    GetMaterialData(ShadowThreshold) - GetMaterialData(ShadowFeather),
+    GetMaterialData(ShadowThreshold) + GetMaterialData(ShadowFeather),
+    halfLambert);
+
+  float3 diffuseToon = lerp(albedo * GetMaterialData(ShadowColor).rgb, albedo, shadowW);
+
+  // ================================================================
+  //  ANIME SPECULAR (Blinn-Phong with hard threshold)
+  // ================================================================
+  float3 H = normalize(L + V);
+  float NdotH = saturate(dot(N, H));
+  float specNDF = pow(NdotH, GetMaterialData(SpecPower));
+
+  float specT = GetMaterialData(SpecularThreshold);
+  float specS = GetMaterialData(SpecularSoftness);
+  float specW = smoothstep(specT - specS, specT + 0.001, specNDF);
+  specW *= step(specT, 0.99);   // OFF when threshold >= 0.99
+  specW *= shadowW;             // only in lit areas
+
+  float3 specularToon = GetMaterialData(SpecColor).rgb * specW * GetMaterialData(SpecularIntensity);
+
+  // ================================================================
+  //  RIM LIGHTING
+  // ================================================================
+  float NdotV = max(0.0, dot(N, V));
+  float rimW = smoothstep(0.4, 0.6, pow(1.0 - NdotV, GetMaterialData(RimPower)));
+  rimW *= shadowW;
+
+  float3 rimToon = GetMaterialData(RimColor).rgb * rimW * GetMaterialData(RimIntensity);
+
+  // ================================================================
+  //  BACKLIGHT (contre-jour)
+  // ================================================================
+  //  Detect: is the light source BEHIND the object from camera's POV?
+  //  L = toward light, V = toward camera.
+  //  Sun BEHIND → L and V in SAME hemisphere → dot(L,V) > 0 → backlight ON
+  //  Sun IN FRONT → L and V OPPOSITE → dot(L,V) < 0 → backlight OFF
+  float3 backlightRim    = float3(0, 0, 0);
+  float  outlineExpand   = 0.0;
+  float3 outlineColorFinal = GetMaterialData(OutlineColor).rgb;
+
+  if (GetMaterialData(UseBacklight))
+  {
+    float LdotV = dot(L, V);
+    float bl = saturate(LdotV);
+    bl = smoothstep(
+      GetMaterialData(BacklightThreshold),
+      GetMaterialData(BacklightThreshold) + 0.2,
+      bl);
+
+    if (bl > 0.0)
+    {
+      // ---- Backlight rim ----
+      float blRim = smoothstep(0.3, 0.7, pow(1.0 - NdotV, GetMaterialData(BacklightRimPower)));
+      blRim *= bl;
+
+      float3 blRimCol = GetMaterialData(BacklightRimColor).rgb;
+      if (GetMaterialData(BacklightRimMixBase))
+        blRimCol = lerp(GetMaterialData(RimColor).rgb, blRimCol, 0.5);
+
+      backlightRim = blRimCol * blRim * GetMaterialData(BacklightRimIntensity);
+
+      // ---- Backlight outline ----
+      outlineExpand = bl * GetMaterialData(BacklightOutlineExpand);
+      float blOIntensity = bl * GetMaterialData(BacklightOutlineIntensity);
+
+      float3 blOCol = GetMaterialData(BacklightOutlineColor).rgb;
+      if (GetMaterialData(BacklightOutlineMixBase))
+        outlineColorFinal = lerp(GetMaterialData(OutlineColor).rgb, blOCol, saturate(blOIntensity));
+      else
+        outlineColorFinal = blOCol;
+    }
+  }
+
+  // ================================================================
+  //  OUTLINE
+  // ================================================================
+  float outW = GetMaterialData(OutlineWidth) + outlineExpand;
+  float outlineMix = step(outW, max(0.0, NdotV));
+
+  // ================================================================
+  //  FINAL
+  // ================================================================
+  float3 toonColor = diffuseToon + specularToon + rimToon + backlightRim;
+  float3 final = lerp(outlineColorFinal, toonColor, outlineMix);
+
+  return final * GetMaterialData(EmissionMultiplier);
+}

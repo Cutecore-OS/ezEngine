@@ -3,7 +3,20 @@
 #include <Core/ResourceManager/ResourceHandle.h>
 #include <Core/World/Component.h>
 #include <Core/World/ComponentManager.h>
-#include <MiniAudioPlugin/MiniAudioPluginDLL.h>
+#include <Foundation/Types/TagSet.h>
+#include <MiniAudioPlugin/Effects/MiniAudioEffect.h>
+
+/// Sphere manipulator whose center follows the audio emitter and whose radius is in world meters.
+class EZ_MINIAUDIOPLUGIN_DLL ezMiniAudioOcclusionManipulatorAttribute : public ezSphereManipulatorAttribute
+{
+  EZ_ADD_DYNAMIC_REFLECTION(ezMiniAudioOcclusionManipulatorAttribute, ezSphereManipulatorAttribute);
+
+public:
+  ezMiniAudioOcclusionManipulatorAttribute()
+    : ezSphereManipulatorAttribute("OcclusionRadius")
+  {
+  }
+};
 
 struct ezMiniAudioSoundInstance;
 using ezMiniAudioSoundResourceHandle = ezTypedResourceHandle<class ezMiniAudioSoundResource>;
@@ -69,8 +82,25 @@ public:
   ///
   /// This is important for global sounds, such as music or UI effects, so that they always play at their regular speed,
   /// even when the game is in slow motion.
-  void SetNoGlobalPitch(bool bEnable);                     // [ property ]
-  bool GetNoGlobalPitch() const;                           // [ property ]
+  void SetNoGlobalPitch(bool bEnable); // [ property ]
+  bool GetNoGlobalPitch() const;       // [ property ]
+
+  /// Empty inherits the sound asset group.
+  ezString m_sGroup;                       // [ property ]
+
+  bool m_bUseOcclusion = false;            // [ property ]
+  float m_fOcclusionThreshold = 0.5f;      // [ property ]
+  ezUInt8 m_uiOcclusionCollisionLayer = 0; // [ property ]
+  /// World-space source sphere radius. Listeners inside are never occluded.
+  float m_fOcclusionRadius = 1.0f; // [ property ]
+  /// Maximum source-listener distance for occlusion. Zero disables it.
+  float m_fOcclusionRange = 50.0f; // [ property ]
+  virtual ezVec3 GetSourcePosition() const;
+  virtual float GetVolumeWeight(const ezVec3& vListener) const { return 1.0f; }
+  float GetOcclusion(const ezVec3& vListener) const;
+  float GetOcclusion(const ezVec3& vListener, const ezVec3& vSource) const;
+
+  ezDynamicArray<ezMiniAudioEffect> m_Effects;             // [ property ]
 
   ezEnum<ezOnComponentFinishedAction2> m_OnFinishedAction; // [ property ]
 
@@ -116,4 +146,14 @@ protected:
   bool m_bPaused = false;
 
   ezMiniAudioSoundInstance* m_pInstance = nullptr;
+
+private:
+  mutable ezTime m_LastOcclusionQuery = ezTime::MakeFromSeconds(-1);
+  mutable float m_fOcclusion = 0.0f;
+  mutable float m_fSmoothedOcclusion = 0.0f;
+  mutable ezTime m_LastOcclusionSmoothing = ezTime::MakeFromSeconds(-1);
+  mutable ezUInt8 m_uiLastOcclusionLayer = 0;
+  mutable float m_fLastOcclusionRadius = -1, m_fLastOcclusionRange = -1;
+  mutable ezVec3 m_vLastOcclusionSource = ezVec3::MakeZero();
+  mutable ezVec3 m_vLastOcclusionListener = ezVec3::MakeZero();
 };

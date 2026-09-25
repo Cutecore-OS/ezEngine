@@ -1,0 +1,47 @@
+[PLATFORMS]
+ALL
+
+[PERMUTATIONS]
+CAMERA_MODE
+
+[RENDERSTATE]
+CullMode = CullMode_None
+DepthTest = false
+DepthWrite = false
+BlendingEnabled0 = true
+SourceBlend0 = Blend_SrcAlpha
+DestBlend0 = Blend_InvSrcAlpha
+SourceBlendAlpha0 = Blend_One
+DestBlendAlpha0 = Blend_InvSrcAlpha
+
+[SHADER]
+#define USE_TEXCOORD0
+#include <Shaders/Materials/MaterialInterpolator.h>
+#include <Shaders/DirectionalTargetIndicatorConstants.h>
+
+[VERTEXSHADER]
+VS_OUT main(uint VertexID : SV_VertexID, uint InstanceID : SV_InstanceID)
+{
+  float2 corners[6] = {
+    float2(0, 0), float2(0, 1), float2(1, 1),
+    float2(0, 0), float2(1, 1), float2(1, 0)
+  };
+  float2 uv = corners[VertexID];
+  float2 position = CenterAndAxisX.xy + (uv.x - 0.5) * CenterAndAxisX.zw + (uv.y - 0.5) * AxisY.xy;
+  VS_OUT result;
+  result.Position = float4(position, 0.0, 1.0);
+  result.TexCoord0 = uv;
+#if CAMERA_MODE == CAMERA_MODE_STEREO
+  result.RenderTargetArrayIndex = InstanceID % 2;
+#endif
+  return result;
+}
+
+[PIXELSHADER]
+Texture2D IndicatorTexture BIND_GROUP(BG_DRAW_CALL);
+SamplerState IndicatorTexture_AutoSampler BIND_GROUP(BG_DRAW_CALL);
+
+float4 main(PS_IN Input) : SV_Target
+{
+  return IndicatorTexture.Sample(IndicatorTexture_AutoSampler, Input.TexCoord0.xy);
+}
