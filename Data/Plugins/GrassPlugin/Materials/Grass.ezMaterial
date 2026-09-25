@@ -1,0 +1,7 @@
+string %Shader { "Shaders/Grass.ezShader" }
+Permutation { string %Variable { "BLEND_MODE" } string %Value { "BLEND_MODE_MASKED" } }
+Permutation { string %Variable { "SHADING_MODE" } string %Value { "SHADING_MODE_LIT" } }
+Permutation { string %Variable { "TWO_SIDED" } string %Value { "TRUE" } }
+Constant { string %Variable { "BaseColor" } Color %Value { f{0.15, 0.4, 0.04, 1.0} } }
+Constant { string %Variable { "RoughnessValue" } f %Value { 0.8 } }
+Constant { string %Variable { "MaskThreshold" } f %Value { 0.25 } }
