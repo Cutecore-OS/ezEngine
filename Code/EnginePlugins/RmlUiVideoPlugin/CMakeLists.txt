@@ -4,6 +4,7 @@ ez_requires_rmlui()
 option(EZ_BUILD_RMLUI_VIDEO "Build the RmlUi video plugin (requires FFmpeg development libraries)" OFF)
 ez_requires(EZ_BUILD_RMLUI_VIDEO)
 set(EZ_RMLUI_VIDEO_FFMPEG_ROOT "" CACHE PATH "FFmpeg SDK root containing include, lib and bin")
+ez_resolve_ffmpeg_sdk(EZ_RMLUI_VIDEO_FFMPEG_ROOT)
 
 find_path(RMLUI_VIDEO_FFMPEG_INCLUDE_DIR libavformat/avformat.h
   HINTS "${EZ_RMLUI_VIDEO_FFMPEG_ROOT}/include" REQUIRED)
