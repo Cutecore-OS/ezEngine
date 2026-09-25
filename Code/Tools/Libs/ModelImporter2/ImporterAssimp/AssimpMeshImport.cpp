@@ -142,7 +142,7 @@ namespace ezModelImporter2
     }
   }
 
-  ezResult ImporterAssimp::ProcessAiMesh(aiMesh* pMesh, const ezMat4& transform, ezStringView sNode)
+  ezResult ImporterAssimp::ProcessAiMesh(aiMesh* pMesh, const ezMat4& transform, ezStringView sNodeName)
   {
     if ((pMesh->mPrimitiveTypes & aiPrimitiveType::aiPrimitiveType_TRIANGLE) == 0) // no triangles in there ?
       return EZ_SUCCESS;
@@ -202,7 +202,7 @@ namespace ezModelImporter2
       auto& mi = m_MeshInstances[pMesh->mMaterialIndex].ExpandAndGetRef();
       mi.m_GlobalTransform = transform;
       mi.m_pMesh = pMesh;
-      mi.m_sNode = sNode;
+      mi.m_sNode = sNodeName;
 
       m_uiTotalMeshVertices += pMesh->mNumVertices;
       m_uiTotalMeshTriangles += pMesh->mNumFaces;
