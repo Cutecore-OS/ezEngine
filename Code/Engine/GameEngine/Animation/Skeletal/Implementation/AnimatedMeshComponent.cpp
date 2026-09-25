@@ -3,6 +3,7 @@
 #include <Core/WorldSerializer/WorldReader.h>
 #include <Core/WorldSerializer/WorldWriter.h>
 #include <GameEngine/Animation/Skeletal/AnimatedMeshComponent.h>
+#include <GameEngine/Animation/Skeletal/BlendShapeComponent.h>
 #include <GameEngine/Physics/CharacterControllerComponent.h>
 #include <RendererCore/AnimationSystem/Declarations.h>
 #include <RendererCore/AnimationSystem/SkeletonResource.h>
@@ -36,6 +37,7 @@ EZ_BEGIN_COMPONENT_TYPE(ezAnimatedMeshComponent, 13, ezComponentMode::Static);
   EZ_BEGIN_MESSAGEHANDLERS
   {
     EZ_MESSAGE_HANDLER(ezMsgAnimationPoseUpdated, OnAnimationPoseUpdated),
+    EZ_MESSAGE_HANDLER(ezMsgAnimationCurveValue, OnAnimationCurve),
     EZ_MESSAGE_HANDLER(ezMsgQueryAnimationSkeleton, OnQueryAnimationSkeleton),
     EZ_MESSAGE_HANDLER(ezMsgCustomInstanceDataOffsetChanged, OnMsgCustomInstanceDataOffsetChanged),
   }
@@ -49,6 +51,23 @@ EZ_END_STATIC_REFLECTED_ENUM;
 // clang-format on
 
 ezAnimatedMeshComponent::ezAnimatedMeshComponent() = default;
+
+void ezAnimatedMeshComponent::UpdateDeformer()
+{
+  if (!m_pDeformer)
+    m_pDeformer = EZ_DEFAULT_NEW(ezBlendShapeDeformer, *this);
+  if (m_pDeformer)
+    m_pDeformer->Update();
+}
+
+void ezAnimatedMeshComponent::OnAnimationCurve(ezMsgAnimationCurveValue& msg)
+{
+  if (!m_pDeformer)
+    m_pDeformer = EZ_DEFAULT_NEW(ezBlendShapeDeformer, *this);
+  if (m_pDeformer)
+    m_pDeformer->OnAnimationCurve(msg);
+}
+
 ezAnimatedMeshComponent::~ezAnimatedMeshComponent() = default;
 
 void ezAnimatedMeshComponent::SerializeComponent(ezWorldWriter& inout_stream) const
@@ -75,6 +94,7 @@ void ezAnimatedMeshComponent::OnActivated()
 
 void ezAnimatedMeshComponent::OnDeactivated()
 {
+  m_pDeformer.Clear();
   m_SkinningState.Clear();
 
   SUPER::OnDeactivated();
@@ -166,7 +186,9 @@ ezTransform ezAnimatedMeshComponent::GetFinalGlobalTransform() const
 
 ezMeshRenderData* ezAnimatedMeshComponent::CreateRenderData(const ezRenderDataManager* pRenderDataManager) const
 {
-  auto pRenderData = pRenderDataManager->CreateRenderDataForThisFrame<ezSkinnedMeshRenderData>(GetOwner());
+  auto pRenderData = m_pDeformer ? m_pDeformer->CreateRenderData(pRenderDataManager) : nullptr;
+  if (pRenderData == nullptr)
+    pRenderData = pRenderDataManager->CreateRenderDataForThisFrame<ezSkinnedMeshRenderData>(GetOwner());
 
   pRenderData->m_DataOffsets.m_uiSkinning = m_SkinningState.m_DataOffset.m_uiOffset;
   pRenderData->m_hSkinningBuffer = pRenderDataManager->GetSkinningDataBuffer();
@@ -322,6 +344,10 @@ void ezAnimatedMeshComponentManager::Initialize()
   auto desc = EZ_CREATE_MODULE_UPDATE_FUNCTION_DESC(ezAnimatedMeshComponentManager::Update, this);
 
   RegisterUpdateFunction(desc);
+  auto deformation = EZ_CREATE_MODULE_UPDATE_FUNCTION_DESC(ezAnimatedMeshComponentManager::UpdateDeformers, this);
+  deformation.m_Phase = ezWorldUpdatePhase::PostTransform;
+  deformation.m_bOnlyUpdateWhenSimulating = false;
+  RegisterUpdateFunction(deformation);
 }
 
 void ezAnimatedMeshComponentManager::ResourceEventHandler(const ezResourceEvent& e)
@@ -371,6 +397,13 @@ void ezAnimatedMeshComponentManager::Update(const ezWorldModule::UpdateContext& 
   }
 
   m_ComponentsToUpdate.Clear();
+}
+
+void ezAnimatedMeshComponentManager::UpdateDeformers(const ezWorldModule::UpdateContext& context)
+{
+  for (auto it = GetComponents(); it.IsValid(); ++it)
+    if (it->IsActiveAndInitialized())
+      it->UpdateDeformer();
 }
 
 void ezAnimatedMeshComponentManager::AddToUpdateList(ezAnimatedMeshComponent* pComponent)

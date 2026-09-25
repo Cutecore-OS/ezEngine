@@ -38,6 +38,7 @@ ezResourceLoadDesc ezMeshResource::UnloadData(Unload WhatToUnload)
 
     m_hMeshBuffer.Invalidate();
     m_hDefaultSkeleton.Invalidate();
+    m_sDefaultBlendShapes.Clear();
 
     res.m_uiQualityLevelsDiscardable = 0;
     res.m_uiQualityLevelsLoadable = 0;
@@ -90,6 +91,7 @@ EZ_RESOURCE_IMPLEMENT_CREATEABLE(ezMeshResource, ezMeshResourceDescriptor)
   m_hMeshBuffer = descriptor.GetExistingMeshBuffer();
 
   m_hDefaultSkeleton = descriptor.m_hDefaultSkeleton;
+  m_sDefaultBlendShapes = descriptor.m_sDefaultBlendShapes;
   m_Bones = descriptor.m_Bones;
   m_fMaxBoneVertexOffset = descriptor.m_fMaxBoneVertexOffset;
 

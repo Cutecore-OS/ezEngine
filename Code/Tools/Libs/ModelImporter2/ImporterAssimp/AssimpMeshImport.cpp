@@ -191,12 +191,18 @@ namespace ezModelImporter2
     }
 
     // if enabled, the aiMesh is modified in-place to have less detail
+    if (m_Options.m_AssimpMeshImported.IsValid() && m_Options.m_uiMeshSimplification != 0)
+    {
+      ezLog::Error("Vertex-aligned mesh extensions require an authored LOD instead of mesh simplification.");
+      return EZ_FAILURE;
+    }
     SimplifyAiMesh(pMesh);
 
     {
       auto& mi = m_MeshInstances[pMesh->mMaterialIndex].ExpandAndGetRef();
       mi.m_GlobalTransform = transform;
       mi.m_pMesh = pMesh;
+      mi.m_sNode = sNodeName;
 
       m_uiTotalMeshVertices += pMesh->mNumVertices;
       m_uiTotalMeshTriangles += pMesh->mNumFaces;
@@ -597,6 +603,8 @@ namespace ezModelImporter2
         }
 
         SetMeshVertexData(mb, mi.m_pMesh, mi.m_GlobalTransform, uiMeshCurVertexIdx, m_Options.m_MeshVertexColorConversion);
+        if (m_Options.m_AssimpMeshImported.IsValid())
+          EZ_SUCCEED_OR_RETURN(m_Options.m_AssimpMeshImported(*mi.m_pMesh, mi.m_sNode, mi.m_GlobalTransform, uiMeshCurVertexIdx));
 
         if (m_Options.m_bImportSkinningData)
         {

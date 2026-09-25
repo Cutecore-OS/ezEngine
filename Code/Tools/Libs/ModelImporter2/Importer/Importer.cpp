@@ -15,7 +15,7 @@ namespace ezModelImporter2
     /// Triangles are only reordered within a sub-mesh, so that the index range of every sub-mesh stays valid.
     /// The vertex reordering is done across the entire mesh buffer and all indices are remapped accordingly.
     /// Only indexed triangle meshes are touched, everything else is left as it is.
-    void OptimizeMeshForRendering(ezMeshResourceDescriptor& ref_desc)
+    void OptimizeMeshForRendering(ezMeshResourceDescriptor& ref_desc, const ImportOptions& options)
     {
       ezMeshBufferResourceDescriptor& mb = ref_desc.MeshBufferDesc();
 
@@ -80,6 +80,9 @@ namespace ezModelImporter2
           remappedIndices.SetCountUninitialized(uiIndexCount);
           meshopt_remapIndexBuffer(remappedIndices.GetData(), indices.GetData(), uiIndexCount, remap.GetData());
           indices.Swap(remappedIndices);
+
+          if (options.m_VertexRemapped.IsValid())
+            options.m_VertexRemapped(remap);
 
           ezDynamicArray<ezUInt8, ezAlignedAllocatorWrapper> remappedStream;
 
@@ -149,7 +152,7 @@ namespace ezModelImporter2
 
       if (res.Succeeded() && m_Options.m_pMeshOutput != nullptr)
       {
-        OptimizeMeshForRendering(*m_Options.m_pMeshOutput);
+        OptimizeMeshForRendering(*m_Options.m_pMeshOutput, m_Options);
       }
     }
 

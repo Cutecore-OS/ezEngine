@@ -147,6 +147,12 @@
         </property>
        </widget>
       </item>
+      <item>
+       <widget class="QCheckBox" name="ImportBlendShapes">
+        <property name="text"><string>Import blend shapes (shape keys)</string></property>
+        <property name="toolTip"><string>Create a blend shape asset and assign it to the animated mesh.</string></property>
+       </widget>
+      </item>
      </layout>
     </widget>
    </item>

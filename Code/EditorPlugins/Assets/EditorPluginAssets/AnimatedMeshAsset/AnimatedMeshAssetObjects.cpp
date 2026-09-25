@@ -1,11 +1,12 @@
 #include <EditorPluginAssets/EditorPluginAssetsPCH.h>
 
 #include <EditorPluginAssets/AnimatedMeshAsset/AnimatedMeshAssetObjects.h>
+#include <EditorPluginAssets/BlendShapeAsset/BlendShapeAsset.h>
 #include <Foundation/Serialization/GraphPatch.h>
 #include <GuiFoundation/PropertyGrid/PropertyMetaState.h>
 
 // clang-format off
-EZ_BEGIN_DYNAMIC_REFLECTED_TYPE(ezAnimatedMeshAssetProperties, 4, ezRTTIDefaultAllocator<ezAnimatedMeshAssetProperties>)
+EZ_BEGIN_DYNAMIC_REFLECTED_TYPE(ezAnimatedMeshAssetProperties, 5, ezRTTIDefaultAllocator<ezAnimatedMeshAssetProperties>)
 {
   EZ_BEGIN_PROPERTIES
   {
@@ -13,6 +14,7 @@ EZ_BEGIN_DYNAMIC_REFLECTED_TYPE(ezAnimatedMeshAssetProperties, 4, ezRTTIDefaultA
     EZ_MEMBER_PROPERTY("MeshIncludeTags", m_sMeshIncludeTags),
     EZ_MEMBER_PROPERTY("MeshExcludeTags", m_sMeshExcludeTags)->AddAttributes(new ezDefaultValueAttribute("$;UCX_")),
     EZ_MEMBER_PROPERTY("DefaultSkeleton", m_sDefaultSkeleton)->AddAttributes(new ezAssetBrowserAttribute("CompatibleAsset_Mesh_Skeleton"), new ezRequiredAttribute()),
+    EZ_MEMBER_PROPERTY("DefaultBlendShapes", m_sDefaultBlendShapes)->AddAttributes(new ezAssetBrowserAttribute("CompatibleAsset_BlendShape", ezDependencyFlags::Package)),
     EZ_MEMBER_PROPERTY("RecalculateNormals", m_bRecalculateNormals),
     EZ_MEMBER_PROPERTY("RecalculateTangents", m_bRecalculateTangents)->AddAttributes(new ezDefaultValueAttribute(true)),
     EZ_MEMBER_PROPERTY("HighPrecision", m_bHighPrecision),

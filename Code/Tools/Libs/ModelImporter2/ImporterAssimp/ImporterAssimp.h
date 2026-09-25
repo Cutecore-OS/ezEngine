@@ -44,6 +44,7 @@ namespace ezModelImporter2
     {
       ezMat4 m_GlobalTransform;
       aiMesh* m_pMesh;
+      ezString m_sNode;
     };
 
     ezMap<ezUInt32, ezHybridArray<MeshInstance, 4>> m_MeshInstances;

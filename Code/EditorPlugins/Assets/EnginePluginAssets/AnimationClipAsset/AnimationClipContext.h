@@ -25,7 +25,7 @@ protected:
 private:
   void QuerySelectionBBox(const ezEditorEngineDocumentMsg* pMsg);
   void SetPlaybackPosition(double pos);
-  void GenerateAndApplyPose();
+  void GenerateAndApplyPose(bool bLivePreview = false);
   void ExtractRootMotionFromFeet();
 
   ezGameObject* m_pGameObject = nullptr;
@@ -33,4 +33,5 @@ private:
   ezString m_sBaseAnimationClip;
   float m_fNormalizedPlaybackPosition = 0.0f;
   ezComponentHandle m_hAnimMeshComponent;
+  ezVariantDictionary m_PreviewBlendShapeWeights;
 };

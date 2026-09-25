@@ -7,6 +7,7 @@
 #include <EditorPluginAssets/Dialogs/MeshImportDlg.moc.h>
 #include <EditorPluginAssets/MeshAsset/MeshAsset.h>
 #include <EditorPluginAssets/SkeletonAsset/SkeletonAsset.h>
+#include <EditorPluginAssets/BlendShapeAsset/BlendShapeAsset.h>
 #include <EditorPluginAssets/Util/MeshImportUtils.h>
 #include <Foundation/Containers/ArrayMap.h>
 #include <Foundation/Utilities/Progress.h>
@@ -21,6 +22,7 @@ bool ezMeshAssetDocumentGenerator::s_bCreateMaterials = true;
 bool ezMeshAssetDocumentGenerator::s_bUseSharedMaterials = false;
 bool ezMeshAssetDocumentGenerator::s_bReuseSkeleton = false;
 bool ezMeshAssetDocumentGenerator::s_bImportAllClips = false;
+bool ezMeshAssetDocumentGenerator::s_bImportBlendShapes = true;
 bool ezMeshAssetDocumentGenerator::s_bAddLODs = false;
 ezUInt8 ezMeshAssetDocumentGenerator::s_uiNumLODs = 1;
 ezUuid ezMeshAssetDocumentGenerator::s_SharedSkeleton;
@@ -84,6 +86,7 @@ ezStatus ezMeshAssetDocumentGenerator::Generate(ezStringView sInputFileAbs, ezSt
     dlg.m_bReuseExistingSkeleton = s_bReuseSkeleton;
     dlg.m_SharedSkeleton = s_SharedSkeleton;
     dlg.m_bImportAnimationClips = s_bImportAllClips;
+    dlg.m_bImportBlendShapes = s_bImportBlendShapes;
     dlg.m_bAddLODs = s_bAddLODs;
     dlg.m_uiNumLODs = s_uiNumLODs;
     dlg.m_sMeshLodPrefix = pPref->m_sMeshLodPrefix.IsEmpty() ? ezString("$LOD") : pPref->m_sMeshLodPrefix;
@@ -118,6 +121,7 @@ ezStatus ezMeshAssetDocumentGenerator::Generate(ezStringView sInputFileAbs, ezSt
       s_bReuseSkeleton = dlg.m_bReuseExistingSkeleton;
       s_SharedSkeleton = dlg.m_SharedSkeleton;
       s_bImportAllClips = dlg.m_bImportAnimationClips;
+      s_bImportBlendShapes = dlg.m_bImportBlendShapes;
     }
 
     if (dlg.m_bApplyToAll)
@@ -415,6 +419,9 @@ ezStatus ezAnimatedMeshAssetDocumentGenerator::ConfigureMeshDocument(ezStringVie
       SetMeshLod(uiLod, foundLods, pPropObj, ca);
 
       ca.FinishTransaction();
+
+      if (s_bImportBlendShapes)
+        EZ_SUCCEED_OR_RETURN(ezImportBlendShapes(*pAnimMeshDoc, out_generatedDocuments));
 
       ezLog::Success("Imported animated mesh: '{}'", sFinalPath);
     }

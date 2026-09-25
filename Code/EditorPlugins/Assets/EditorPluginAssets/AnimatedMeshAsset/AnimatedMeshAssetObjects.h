@@ -1,11 +1,12 @@
 #pragma once
+#include <EditorPluginAssets/EditorPluginAssetsDLL.h>
 
 #include <EditorPluginAssets/Util/AssetUtils.h>
 #include <RendererCore/Meshes/MeshBufferUtils.h>
 
 struct ezPropertyMetaStateEvent;
 
-class ezAnimatedMeshAssetProperties : public ezReflectedClass
+class EZ_EDITORPLUGINASSETS_DLL ezAnimatedMeshAssetProperties : public ezReflectedClass
 {
   EZ_ADD_DYNAMIC_REFLECTION(ezAnimatedMeshAssetProperties, ezReflectedClass);
 
@@ -19,6 +20,7 @@ public:
   ezString m_sMeshIncludeTags;
   ezString m_sMeshExcludeTags;
   ezString m_sDefaultSkeleton;
+  ezString m_sDefaultBlendShapes;
 
   bool m_bRecalculateNormals = false;
   bool m_bRecalculateTangents = true;

@@ -4,6 +4,7 @@
 #include <EditorFramework/DocumentWindow/OrbitCamViewWidget.moc.h>
 #include <EditorFramework/InputContexts/OrbitCameraContext.h>
 #include <EditorPluginAssets/AnimationClipAsset/AnimationClipAssetWindow.moc.h>
+#include <EditorPluginAssets/BlendShapeAsset/BlendShapeAsset.h>
 #include <Foundation/Algorithm/HashingUtils.h>
 #include <GuiFoundation/ActionViews/MenuBarActionMapView.moc.h>
 #include <GuiFoundation/ActionViews/ToolBarActionMapView.moc.h>
@@ -12,6 +13,87 @@
 #include <GuiFoundation/Widgets/EventTrackEditorWidget.moc.h>
 #include <GuiFoundation/Widgets/TimeScrubberWidget.moc.h>
 #include <ToolsFoundation/Object/ObjectCommandAccessor.h>
+#include <QListWidget>
+#include <QSignalBlocker>
+#include <QSplitter>
+#include <RendererCore/AnimationSystem/BlendShapeResource.h>
+
+namespace
+{
+  QWidget* CreateNamedCurvePanel(ezQtCurve1DEditorWidget* editor, QListWidget*& names,
+    ezCurveGroupData& curves, const char* objectName)
+  {
+    auto* splitter = new QSplitter(Qt::Horizontal, editor->parentWidget());
+    names = new QListWidget(splitter);
+    names->setObjectName(objectName);
+    names->setSelectionMode(QAbstractItemView::ExtendedSelection);
+    names->setMinimumWidth(130);
+    names->setToolTip("Select a curve by name to select its control points. Ctrl selects multiple curves.");
+    splitter->addWidget(names);
+    splitter->addWidget(editor);
+    splitter->setStretchFactor(1, 1);
+    splitter->setSizes({190, 650});
+    QObject::connect(names, &QListWidget::itemSelectionChanged, editor, [editor, names, &curves]()
+    {
+      {
+        QSignalBlocker block(editor->CurveEdit);
+        editor->CurveEdit->ClearSelection();
+        for (auto* item : names->selectedItems())
+        {
+          const auto curve = static_cast<ezUInt32>(names->row(item));
+          if (curve >= curves.m_Curves.GetCount())
+            continue;
+          for (ezUInt32 point = 0; point < curves.m_Curves[curve]->m_ControlPoints.GetCount(); ++point)
+            editor->CurveEdit->SetSelected({static_cast<ezUInt16>(curve), static_cast<ezUInt16>(point)}, true);
+        }
+      }
+      editor->CurveEdit->SelectionChangedEvent();
+    });
+    QObject::connect(editor->CurveEdit, &ezQtCurveEditWidget::SelectionChangedEvent, names, [editor, names]()
+    {
+      QSignalBlocker block(names);
+      names->clearSelection();
+      for (const auto& point : editor->CurveEdit->GetSelection())
+        if (point.m_uiCurve < names->count())
+          names->item(point.m_uiCurve)->setSelected(true);
+    });
+    QObject::connect(editor, &ezQtCurve1DEditorWidget::CpMovedEvent, names, [names](ezUInt32 curve, ezUInt32, ezInt64, double)
+    {
+      if (curve < static_cast<ezUInt32>(names->count()))
+        names->scrollToItem(names->item(curve));
+    });
+    QObject::connect(editor->CurveEdit, &ezQtCurveEditWidget::MoveCurveEvent, names, [names](ezInt32 curve, double)
+    {
+      QSignalBlocker block(names);
+      names->clearSelection();
+      if (curve >= 0 && curve < names->count())
+        names->item(curve)->setSelected(true);
+    });
+    return splitter;
+  }
+
+  void UpdateCurveNames(QListWidget* names, const ezDynamicArray<ezAnimationClipCurveData>& curves)
+  {
+    if (names == nullptr)
+      return;
+    QSignalBlocker block(names);
+    while (names->count() > static_cast<int>(curves.GetCount()))
+      delete names->takeItem(names->count() - 1);
+    for (ezUInt32 i = 0; i < curves.GetCount(); ++i)
+    {
+      if (i == static_cast<ezUInt32>(names->count()))
+        names->addItem(new QListWidgetItem());
+      auto* item = names->item(i);
+      const auto name = ezMakeQString(curves[i].m_sName);
+      item->setText(name.isEmpty() ? QString("Curve %1").arg(i + 1) : name);
+      item->setToolTip(item->text());
+      QPixmap swatch(12, 12);
+      const auto color = curves[i].m_Curve.m_CurveColor;
+      swatch.fill(QColor(color.r, color.g, color.b));
+      item->setIcon(QIcon(swatch));
+    }
+  }
+}
 
 ezQtAnimationClipAssetDocumentWindow::ezQtAnimationClipAssetDocumentWindow(ezAnimationClipAssetDocument* pDocument)
   : ezQtEngineDocumentWindow(pDocument)
@@ -124,7 +206,7 @@ ezQtAnimationClipAssetDocumentWindow::ezQtAnimationClipAssetDocumentWindow(ezAni
     m_pCurveEditPanel->show();
 
     m_pCurveEditor = new ezQtCurve1DEditorWidget(this);
-    m_pCurveEditPanel->setWidget(m_pCurveEditor);
+    m_pCurveEditPanel->setWidget(CreateNamedCurvePanel(m_pCurveEditor, m_pCurveNames, m_Curves, "AnimationCurveNames"));
 
     connect(m_pCurveEditor, &ezQtCurve1DEditorWidget::InsertCpEvent, this, &ezQtAnimationClipAssetDocumentWindow::onCurveInsertCpAt);
     connect(m_pCurveEditor, &ezQtCurve1DEditorWidget::CpMovedEvent, this, &ezQtAnimationClipAssetDocumentWindow::onCurveCpMoved);
@@ -143,11 +225,43 @@ ezQtAnimationClipAssetDocumentWindow::ezQtAnimationClipAssetDocumentWindow(ezAni
     UpdateCurveEditor();
   }
 
+  // Morph tracks use the native curve editor and document transactions.
+  {
+    m_pBlendShapePanel = new ezQtDocumentPanel(GetContainerWindow()->GetDockManager(), this, pDocument);
+    m_pBlendShapePanel->setObjectName("AnimClipBlendShapeCurvesPanel");
+    m_pBlendShapePanel->setWindowTitle("Blend Shapes");
+    m_pBlendShapePanel->show();
+
+    m_pBlendShapeEditor = new ezQtCurve1DEditorWidget(this);
+    m_pBlendShapePanel->setWidget(CreateNamedCurvePanel(m_pBlendShapeEditor, m_pBlendShapeNames, m_BlendShapeCurves, "BlendShapeCurveNames"));
+
+    connect(m_pBlendShapeEditor, &ezQtCurve1DEditorWidget::InsertCpEvent, this, &ezQtAnimationClipAssetDocumentWindow::onCurveInsertCpAt);
+    connect(m_pBlendShapeEditor, &ezQtCurve1DEditorWidget::CpMovedEvent, this, &ezQtAnimationClipAssetDocumentWindow::onCurveCpMoved);
+    connect(m_pBlendShapeEditor, &ezQtCurve1DEditorWidget::CpDeletedEvent, this, &ezQtAnimationClipAssetDocumentWindow::onCurveCpDeleted);
+    connect(m_pBlendShapeEditor, &ezQtCurve1DEditorWidget::TangentMovedEvent, this, &ezQtAnimationClipAssetDocumentWindow::onCurveTangentMoved);
+    connect(m_pBlendShapeEditor, &ezQtCurve1DEditorWidget::TangentLinkEvent, this, &ezQtAnimationClipAssetDocumentWindow::onLinkCurveTangents);
+    connect(m_pBlendShapeEditor, &ezQtCurve1DEditorWidget::CpTangentModeEvent, this, &ezQtAnimationClipAssetDocumentWindow::onCurveTangentModeChanged);
+
+    connect(m_pBlendShapeEditor, &ezQtCurve1DEditorWidget::BeginOperationEvent, this, &ezQtAnimationClipAssetDocumentWindow::onCurveBeginOperation);
+    connect(m_pBlendShapeEditor, &ezQtCurve1DEditorWidget::EndOperationEvent, this, &ezQtAnimationClipAssetDocumentWindow::onCurveEndOperation);
+    connect(m_pBlendShapeEditor, &ezQtCurve1DEditorWidget::BeginCpChangesEvent, this, &ezQtAnimationClipAssetDocumentWindow::onCurveBeginCpChanges);
+    connect(m_pBlendShapeEditor, &ezQtCurve1DEditorWidget::EndCpChangesEvent, this, &ezQtAnimationClipAssetDocumentWindow::onCurveEndCpChanges);
+
+    if (auto* pArea = m_pEventTrackPanel->dockAreaWidget())
+      m_pDockManager->addDockWidgetTabToArea(m_pBlendShapePanel, pArea);
+    else
+      m_pDockManager->addDockWidgetTab(ads::BottomDockWidgetArea, m_pBlendShapePanel);
+
+    UpdateCurveEditor();
+  }
+
   FinishWindowCreation();
 
   GetAnimationClipDocument()->m_CommonAssetUiChangeEvent.AddEventHandler(ezMakeDelegate(&ezQtAnimationClipAssetDocumentWindow::CommonAssetUiEventHandler, this));
   GetDocument()->GetCommandHistory()->m_Events.AddEventHandler(ezMakeDelegate(&ezQtAnimationClipAssetDocumentWindow::CommandHistoryEventHandler, this));
   pDocument->GetObjectManager()->m_StructureEvents.AddEventHandler(ezMakeDelegate(&ezQtAnimationClipAssetDocumentWindow::StructureEventHandler, this));
+  pDocument->GetObjectManager()->m_PropertyEvents.AddEventHandler(ezMakeDelegate(&ezQtAnimationClipAssetDocumentWindow::BlendShapePropertyEventHandler, this));
+  ScheduleBlendShapeRefresh();
 }
 
 ezQtAnimationClipAssetDocumentWindow::~ezQtAnimationClipAssetDocumentWindow()
@@ -155,6 +269,7 @@ ezQtAnimationClipAssetDocumentWindow::~ezQtAnimationClipAssetDocumentWindow()
   GetAnimationClipDocument()->m_CommonAssetUiChangeEvent.RemoveEventHandler(ezMakeDelegate(&ezQtAnimationClipAssetDocumentWindow::CommonAssetUiEventHandler, this));
   GetDocument()->GetCommandHistory()->m_Events.RemoveEventHandler(ezMakeDelegate(&ezQtAnimationClipAssetDocumentWindow::CommandHistoryEventHandler, this));
   GetDocument()->GetObjectManager()->m_StructureEvents.RemoveEventHandler(ezMakeDelegate(&ezQtAnimationClipAssetDocumentWindow::StructureEventHandler, this));
+  GetDocument()->GetObjectManager()->m_PropertyEvents.RemoveEventHandler(ezMakeDelegate(&ezQtAnimationClipAssetDocumentWindow::BlendShapePropertyEventHandler, this));
 }
 
 ezAnimationClipAssetDocument* ezQtAnimationClipAssetDocumentWindow::GetAnimationClipDocument()
@@ -208,6 +323,22 @@ void ezQtAnimationClipAssetDocumentWindow::SendRedrawMsg()
     GetEditorEngineConnection()->SendMessage(&msg);
   }
 
+  // Preview the in-memory curves; dragging never saves or transforms the asset.
+  {
+    ezVariantDictionary weights;
+    const auto& shapes = GetAnimationClipDocument()->GetProperties()->m_BlendShapes;
+    for (ezUInt32 i = 0; i < ezMath::Min(shapes.GetCount(), m_BlendShapePreviewCurves.GetCount()); ++i)
+    {
+      ezStringBuilder name;
+      ezBlendShapeResourceDescriptor::MakeCurveName(shapes[i].m_sName, name);
+      weights.Insert(name, static_cast<float>(m_BlendShapePreviewCurves[i].Evaluate(m_PlaybackPosition.GetSeconds())));
+    }
+    ezSimpleDocumentConfigMsgToEngine msg;
+    msg.m_sWhatToDo = "BlendShapePreview";
+    msg.m_PayloadValue = weights;
+    GetDocument()->SendMessageToEngine(&msg);
+  }
+
   for (auto pView : m_ViewWidgets)
   {
     pView->SetEnablePicking(false);
@@ -257,6 +388,29 @@ void ezQtAnimationClipAssetDocumentWindow::UpdateCurveEditor()
 
   m_pCurveEditor->SetCurveExtents(0.0f, m_ClipDuration.GetSeconds(), true, true);
   m_pCurveEditor->SetCurves(m_Curves);
+  UpdateCurveNames(m_pCurveNames, curves);
+  if (m_pBlendShapeEditor)
+  {
+    m_BlendShapeCurves.Clear();
+    m_BlendShapeCurves.m_bOwnsData = false;
+    ezInt32 iShapeColor = 0;
+    for (auto& curve : pDoc->GetProperties()->m_BlendShapes)
+    {
+      curve.m_Curve.m_CurveColor = GetColorForCurveName(curve.m_sName, iShapeColor++);
+      m_BlendShapeCurves.m_Curves.PushBack(&curve.m_Curve);
+    }
+    m_pBlendShapeEditor->SetCurveExtents(0.0f, m_ClipDuration.GetSeconds(), true, true);
+    m_pBlendShapeEditor->SetCurves(m_BlendShapeCurves);
+    UpdateCurveNames(m_pBlendShapeNames, pDoc->GetProperties()->m_BlendShapes);
+    m_BlendShapePreviewCurves.SetCount(m_BlendShapeCurves.m_Curves.GetCount());
+    for (ezUInt32 i = 0; i < m_BlendShapePreviewCurves.GetCount(); ++i)
+    {
+      auto& curve = m_BlendShapePreviewCurves[i];
+      m_BlendShapeCurves.ConvertToRuntimeData(i, curve);
+      curve.SortControlPoints();
+      curve.CreateLinearApproximation();
+    }
+  }
 }
 
 void ezQtAnimationClipAssetDocumentWindow::InternalRedraw()
@@ -292,6 +446,8 @@ void ezQtAnimationClipAssetDocumentWindow::InternalRedraw()
   m_pTimeScrubber->SetScrubberPosition(m_PlaybackPosition);
   m_pEventTrackEditor->SetScrubberPosition(m_PlaybackPosition);
   m_pCurveEditor->SetScrubberPosition(m_PlaybackPosition);
+  if (m_pBlendShapeEditor)
+    m_pBlendShapeEditor->SetScrubberPosition(m_PlaybackPosition);
 
   ezEditorInputContext::UpdateActiveInputContext();
   SendRedrawMsg();
@@ -334,6 +490,8 @@ void ezQtAnimationClipAssetDocumentWindow::ProcessMessageEventHandler(const ezEd
 
         m_pEventTrackEditor->FrameCurve();
         m_pCurveEditor->FrameCurve();
+        if (m_pBlendShapeEditor)
+          m_pBlendShapeEditor->FrameCurve();
       }
 
       return;
@@ -468,10 +626,17 @@ void ezQtAnimationClipAssetDocumentWindow::onEventTrackEndCpChanges()
 }
 
 /// Returns the ezSingleCurveData document object for Curves[uiCurveIdx].m_Curve
-static const ezDocumentObject* GetCurveSubObject(ezAnimationClipAssetDocument* pDoc, ezUInt32 uiCurveIdx)
+const char* ezQtAnimationClipAssetDocumentWindow::GetEditedCurveProperty() const
 {
-  const ezVariant namedCurveGuid = pDoc->GetPropertyObject()->GetTypeAccessor().GetValue("Curves", uiCurveIdx);
+  return sender() == m_pBlendShapeEditor ? "BlendShapes" : "Curves";
+}
+
+static const ezDocumentObject* GetCurveSubObject(ezAnimationClipAssetDocument* pDoc, ezUInt32 uiCurveIdx, const char* szProperty)
+{
+  const ezVariant namedCurveGuid = pDoc->GetPropertyObject()->GetTypeAccessor().GetValue(szProperty, uiCurveIdx);
   const ezDocumentObject* pNamedCurve = pDoc->GetObjectManager()->GetObject(namedCurveGuid.Get<ezUuid>());
+  if (ezStringUtils::IsEqual(szProperty, "BlendShapes"))
+    pDoc->GetObjectAccessor()->SetValueByName(pNamedCurve, "OverrideSource", true).AssertSuccess();
   const ezVariant curveGuid = pNamedCurve->GetTypeAccessor().GetValue("Curve");
   return pDoc->GetObjectManager()->GetObject(curveGuid.Get<ezUuid>());
 }
@@ -483,18 +648,18 @@ void ezQtAnimationClipAssetDocumentWindow::onCurveInsertCpAt(ezUInt32 uiCurveIdx
   ezCommandHistory* history = pDoc->GetCommandHistory();
 
   // If there is no curve at uiCurveIdx yet, add a new named curve entry
-  while (pDoc->GetPropertyObject()->GetTypeAccessor().GetCount("Curves") <= static_cast<ezInt32>(uiCurveIdx))
+  while (pDoc->GetPropertyObject()->GetTypeAccessor().GetCount(GetEditedCurveProperty()) <= static_cast<ezInt32>(uiCurveIdx))
   {
     ezAddObjectCommand cmdAdd;
     cmdAdd.m_Parent = pDoc->GetPropertyObject()->GetGuid();
-    cmdAdd.m_sParentProperty = "Curves";
+    cmdAdd.m_sParentProperty = GetEditedCurveProperty();
     cmdAdd.m_pType = ezGetStaticRTTI<ezAnimationClipCurveData>();
     cmdAdd.m_Index = -1;
     cmdAdd.m_NewObjectGuid = ezUuid::MakeUuid();
     history->AddCommand(cmdAdd).AssertSuccess();
   }
 
-  const ezDocumentObject* pCurveObj = GetCurveSubObject(pDoc, uiCurveIdx);
+  const ezDocumentObject* pCurveObj = GetCurveSubObject(pDoc, uiCurveIdx, GetEditedCurveProperty());
 
   ezAddObjectCommand cmdAdd;
   cmdAdd.m_Parent = pCurveObj->GetGuid();
@@ -531,7 +696,7 @@ void ezQtAnimationClipAssetDocumentWindow::onCurveCpMoved(ezUInt32 curveIdx, ezU
 
   auto* pDoc = static_cast<ezAnimationClipAssetDocument*>(GetDocument());
 
-  const ezDocumentObject* pCurveObj = GetCurveSubObject(pDoc, curveIdx);
+  const ezDocumentObject* pCurveObj = GetCurveSubObject(pDoc, curveIdx, GetEditedCurveProperty());
   const ezVariant cpGuid = pCurveObj->GetTypeAccessor().GetValue("ControlPoints", cpIdx);
 
   ezSetObjectPropertyCommand cmdSet;
@@ -551,7 +716,7 @@ void ezQtAnimationClipAssetDocumentWindow::onCurveCpDeleted(ezUInt32 curveIdx, e
 {
   auto* pDoc = static_cast<ezAnimationClipAssetDocument*>(GetDocument());
 
-  const ezDocumentObject* pCurveObj = GetCurveSubObject(pDoc, curveIdx);
+  const ezDocumentObject* pCurveObj = GetCurveSubObject(pDoc, curveIdx, GetEditedCurveProperty());
   const ezVariant cpGuid = pCurveObj->GetTypeAccessor().GetValue("ControlPoints", cpIdx);
 
   if (!cpGuid.IsValid())
@@ -567,7 +732,7 @@ void ezQtAnimationClipAssetDocumentWindow::onCurveTangentMoved(ezUInt32 curveIdx
 {
   auto* pDoc = static_cast<ezAnimationClipAssetDocument*>(GetDocument());
 
-  const ezDocumentObject* pCurveObj = GetCurveSubObject(pDoc, curveIdx);
+  const ezDocumentObject* pCurveObj = GetCurveSubObject(pDoc, curveIdx, GetEditedCurveProperty());
   const ezVariant cpGuid = pCurveObj->GetTypeAccessor().GetValue("ControlPoints", cpIdx);
 
   ezSetObjectPropertyCommand cmdSet;
@@ -589,7 +754,7 @@ void ezQtAnimationClipAssetDocumentWindow::onLinkCurveTangents(ezUInt32 curveIdx
 {
   auto* pDoc = static_cast<ezAnimationClipAssetDocument*>(GetDocument());
 
-  const ezDocumentObject* pCurveObj = GetCurveSubObject(pDoc, curveIdx);
+  const ezDocumentObject* pCurveObj = GetCurveSubObject(pDoc, curveIdx, GetEditedCurveProperty());
   const ezVariant cpGuid = pCurveObj->GetTypeAccessor().GetValue("ControlPoints", cpIdx);
 
   ezSetObjectPropertyCommand cmdLink;
@@ -600,7 +765,8 @@ void ezQtAnimationClipAssetDocumentWindow::onLinkCurveTangents(ezUInt32 curveIdx
 
   if (bLink)
   {
-    const ezVec2 leftTangent = pDoc->GetProperties()->m_Curves[curveIdx].m_Curve.m_ControlPoints[cpIdx].m_LeftTangent;
+    const auto& curves = sender() == m_pBlendShapeEditor ? pDoc->GetProperties()->m_BlendShapes : pDoc->GetProperties()->m_Curves;
+    const ezVec2 leftTangent = curves[curveIdx].m_Curve.m_ControlPoints[cpIdx].m_LeftTangent;
     const ezVec2 rightTangent = -leftTangent;
 
     onCurveTangentMoved(curveIdx, cpIdx, rightTangent.x, rightTangent.y, true);
@@ -612,7 +778,7 @@ void ezQtAnimationClipAssetDocumentWindow::onCurveTangentModeChanged(ezUInt32 cu
 {
   auto* pDoc = static_cast<ezAnimationClipAssetDocument*>(GetDocument());
 
-  const ezDocumentObject* pCurveObj = GetCurveSubObject(pDoc, curveIdx);
+  const ezDocumentObject* pCurveObj = GetCurveSubObject(pDoc, curveIdx, GetEditedCurveProperty());
   const ezVariant cpGuid = pCurveObj->GetTypeAccessor().GetValue("ControlPoints", cpIdx);
 
   ezSetObjectPropertyCommand cmd;
@@ -655,6 +821,14 @@ void ezQtAnimationClipAssetDocumentWindow::onCurveEndCpChanges()
 
 void ezQtAnimationClipAssetDocumentWindow::OnAfterDocumentLayoutRestored()
 {
+  if (m_pBlendShapePanel && m_pBlendShapePanel->isClosed())
+  {
+    if (auto* pArea = m_pEventTrackPanel->dockAreaWidget())
+      m_pDockManager->addDockWidgetTabToArea(m_pBlendShapePanel, pArea);
+    else
+      m_pDockManager->addDockWidgetTab(ads::BottomDockWidgetArea, m_pBlendShapePanel);
+  }
+
   // ADS flags dock widgets not found in the saved layout as "unassigned" (closed, detached from all dock areas).
   // Re-add the panel to its default location.
   if (m_pCurveEditPanel->isClosed())
@@ -697,4 +871,33 @@ void ezQtAnimationClipAssetDocumentWindow::CommandHistoryEventHandler(const ezCo
     UpdateEventTrackEditor();
     UpdateCurveEditor();
   }
+}
+
+void ezQtAnimationClipAssetDocumentWindow::ScheduleBlendShapeRefresh()
+{
+  if (m_bBlendShapeRefreshPending)
+    return;
+  m_bBlendShapeRefreshPending = true;
+  QTimer::singleShot(0, this, [this]()
+  {
+    m_bBlendShapeRefreshPending = false;
+    if (GetDocument()->GetCommandHistory()->IsInTransaction())
+    {
+      ScheduleBlendShapeRefresh();
+      return;
+    }
+    const auto status = GetAnimationClipDocument()->RefreshBlendShapeCurves();
+    if (status.Failed())
+      ShowTemporaryStatusBarMsg(ezFmt("Blend Shapes: {}", status.GetMessageString()));
+    UpdateCurveEditor();
+  });
+}
+
+void ezQtAnimationClipAssetDocumentWindow::BlendShapePropertyEventHandler(const ezDocumentObjectPropertyEvent& e)
+{
+  if (e.m_pObject != GetAnimationClipDocument()->GetPropertyObject())
+    return;
+  if (e.m_sProperty == "File" || e.m_sProperty == "PreviewMesh" || e.m_sProperty == "UseAnimationClip" ||
+      e.m_sProperty == "FirstFrame" || e.m_sProperty == "NumFrames" || e.m_sProperty == "ImportBlendShapes")
+    ScheduleBlendShapeRefresh();
 }

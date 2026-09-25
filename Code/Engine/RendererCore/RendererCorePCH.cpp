@@ -5,6 +5,12 @@ EZ_STATICLINK_LIBRARY(RendererCore)
   if (bReturn)
     return;
 
+  EZ_STATICLINK_REFERENCE(RendererCore_AnimationSystem_AnimGraph_Nodes_BlendShapes_BlendShapeAnimNode);
+
+  EZ_STATICLINK_REFERENCE(RendererCore_Meshes_Implementation_BlendShapeRenderer);
+
+  EZ_STATICLINK_REFERENCE(RendererCore_AnimationSystem_Implementation_BlendShapeResource);
+
   EZ_STATICLINK_REFERENCE(RendererCore_AnimationSystem_AnimGraph_Implementation_AnimGraphNode);
   EZ_STATICLINK_REFERENCE(RendererCore_AnimationSystem_AnimGraph_Implementation_AnimGraphPins);
   EZ_STATICLINK_REFERENCE(RendererCore_AnimationSystem_AnimGraph_Implementation_AnimGraphResource);

@@ -1,4 +1,5 @@
 #pragma once
+#include <EditorPluginAssets/EditorPluginAssetsDLL.h>
 
 #include <EditorFramework/Assets/AssetDocumentGenerator.h>
 #include <EditorFramework/Assets/SimpleAssetDocument.h>
@@ -48,18 +49,19 @@ EZ_DECLARE_REFLECTABLE_TYPE(EZ_NO_LINKAGE, ezAdditiveAnimationReference);
 /// Stores a single named float curve for use in an animation clip.
 ///
 /// The color used for display in the editor is derived automatically from the name.
-class EZ_NO_LINKAGE ezAnimationClipCurveData : public ezReflectedClass
+class EZ_EDITORPLUGINASSETS_DLL ezAnimationClipCurveData : public ezReflectedClass
 {
   EZ_ADD_DYNAMIC_REFLECTION(ezAnimationClipCurveData, ezReflectedClass);
 
 public:
-  ezString m_sName;          ///< Identifies this curve across clips. Used to match values from multiple clips for blending.
-  ezSingleCurveData m_Curve; ///< The curve data. Color is overridden at edit time based on m_sName.
+  bool m_bOverrideSource = false; ///< Morph tracks opt into authored overrides; ordinary curves ignore this.
+  ezString m_sName;               ///< Identifies this curve across clips. Used to match values from multiple clips for blending.
+  ezSingleCurveData m_Curve;      ///< The curve data. Color is overridden at edit time based on m_sName.
 };
 
 //////////////////////////////////////////////////////////////////////////
 
-class ezAnimationClipAssetProperties : public ezReflectedClass
+class EZ_EDITORPLUGINASSETS_DLL ezAnimationClipAssetProperties : public ezReflectedClass
 {
   EZ_ADD_DYNAMIC_REFLECTION(ezAnimationClipAssetProperties, ezReflectedClass);
 
@@ -82,13 +84,15 @@ public:
 
   ezEventTrackData m_EventTrack;
   ezDynamicArray<ezAnimationClipCurveData> m_Curves;
+  ezDynamicArray<ezAnimationClipCurveData> m_BlendShapes;
+  bool m_bImportBlendShapes = true;
 
   static void PropertyMetaStateEventHandler(ezPropertyMetaStateEvent& e);
 };
 
 //////////////////////////////////////////////////////////////////////////
 
-class ezAnimationClipAssetDocument : public ezSimpleAssetDocument<ezAnimationClipAssetProperties>
+class EZ_EDITORPLUGINASSETS_DLL ezAnimationClipAssetDocument : public ezSimpleAssetDocument<ezAnimationClipAssetProperties>
 {
   EZ_ADD_DYNAMIC_REFLECTION(ezAnimationClipAssetDocument, ezSimpleAssetDocument<ezAnimationClipAssetProperties>);
 
@@ -97,6 +101,10 @@ public:
 
   virtual void SetCommonAssetUiState(ezCommonAssetUiState::Enum state, double value) override;
   virtual double GetCommonAssetUiState(ezCommonAssetUiState::Enum state) const override;
+
+  /// Synchronize editable morph tracks with the source clip and Preview Mesh.
+  ezStatus RefreshBlendShapeCurves();
+  void SetBlendShapeCurves(const ezDynamicArray<ezAnimationClipCurveData>& curves);
 
   ezUuid InsertEventTrackCpAt(ezInt64 iTickX, const char* szValue);
 

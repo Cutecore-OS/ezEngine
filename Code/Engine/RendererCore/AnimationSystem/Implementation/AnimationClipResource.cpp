@@ -130,6 +130,10 @@ void ezAnimationClipResourceDescriptor::operator=(ezAnimationClipResourceDescrip
   m_uiNumTotalRotations = rhs.m_uiNumTotalRotations;
   m_uiNumTotalScales = rhs.m_uiNumTotalScales;
   m_Duration = rhs.m_Duration;
+  m_vConstantRootMotion = rhs.m_vConstantRootMotion;
+  m_CustomCurves = std::move(rhs.m_CustomCurves);
+  m_EventTrack = std::move(rhs.m_EventTrack);
+  m_bAdditive = rhs.m_bAdditive;
 }
 
 ezResult ezAnimationClipResourceDescriptor::Serialize(ezStreamWriter& inout_stream) const
