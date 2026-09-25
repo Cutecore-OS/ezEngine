@@ -218,8 +218,8 @@ float BacklightThreshold @Default(0.1) @Clamp(0.0, 1.0);
 // @category Light
 // @brief When true, uses the engine's brightest directional light (sun).
 //        When false, uses the manual LightDirection vector below.
-// @default true
-bool UseEngineLightDirection @Default(true);
+// @default false
+bool UseEngineLightDirection @Default(false);
 
 // @category Light
 
