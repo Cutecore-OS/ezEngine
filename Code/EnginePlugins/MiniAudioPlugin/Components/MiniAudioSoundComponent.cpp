@@ -1,5 +1,6 @@
 #include <MiniAudioPlugin/MiniAudioPluginPCH.h>
 
+#include <Core/Interfaces/PhysicsWorldModule.h>
 #include <Core/Messages/DeleteObjectMessage.h>
 #include <Core/ResourceManager/Implementation/ResourceHandleReflection.h>
 #include <Core/World/GameObject.h>
@@ -7,8 +8,14 @@
 #include <Core/WorldSerializer/WorldWriter.h>
 #include <Foundation/IO/FileSystem/FileSystem.h>
 #include <MiniAudioPlugin/Components/MiniAudioSoundComponent.h>
+#include <MiniAudioPlugin/Effects/MiniAudioEffectNode.h>
 #include <MiniAudioPlugin/MiniAudioSingleton.h>
 #include <MiniAudioPlugin/Resources/MiniAudioSoundResource.h>
+
+// clang-format off
+EZ_BEGIN_DYNAMIC_REFLECTED_TYPE(ezMiniAudioOcclusionManipulatorAttribute, 1, ezRTTIDefaultAllocator<ezMiniAudioOcclusionManipulatorAttribute>)
+EZ_END_DYNAMIC_REFLECTED_TYPE;
+// clang-format on
 
 ezMiniAudioSoundComponentManager::ezMiniAudioSoundComponentManager(ezWorld* pWorld)
   : ezComponentManager(pWorld)
@@ -69,7 +76,7 @@ void ezMiniAudioSoundComponentManager::UpdateEvents(const ezWorldModule::UpdateC
 //////////////////////////////////////////////////////////////////////////
 
 // clang-format off
-EZ_BEGIN_COMPONENT_TYPE(ezMiniAudioSoundComponent, 1, ezComponentMode::Static)
+EZ_BEGIN_COMPONENT_TYPE(ezMiniAudioSoundComponent, 6, ezComponentMode::Static)
 {
   EZ_BEGIN_PROPERTIES
   {
@@ -78,6 +85,13 @@ EZ_BEGIN_COMPONENT_TYPE(ezMiniAudioSoundComponent, 1, ezComponentMode::Static)
     EZ_ACCESSOR_PROPERTY("Volume", GetVolume, SetVolume)->AddAttributes(new ezDefaultValueAttribute(1.0f), new ezClampValueAttribute(0.0f, 1.0f)),
     EZ_ACCESSOR_PROPERTY("Pitch", GetPitch, SetPitch)->AddAttributes(new ezDefaultValueAttribute(1.0f), new ezClampValueAttribute(0.1f, 10.0f)),
     EZ_ACCESSOR_PROPERTY("NoGlobalPitch", GetNoGlobalPitch, SetNoGlobalPitch),
+    EZ_MEMBER_PROPERTY("Group", m_sGroup)->AddAttributes(new ezDynamicStringEnumAttribute("MiniAudioSoundGroups"), new ezDefaultValueAttribute("")),
+    EZ_ARRAY_MEMBER_PROPERTY("Effects", m_Effects),
+    EZ_MEMBER_PROPERTY("UseOcclusion", m_bUseOcclusion),
+    EZ_MEMBER_PROPERTY("OcclusionRadius", m_fOcclusionRadius)->AddAttributes(new ezDefaultValueAttribute(1.0f), new ezClampValueAttribute(0.0f, ezVariant()), new ezSuffixAttribute(" m")),
+    EZ_MEMBER_PROPERTY("OcclusionRange", m_fOcclusionRange)->AddAttributes(new ezDefaultValueAttribute(50.0f), new ezClampValueAttribute(0.0f, ezVariant()), new ezSuffixAttribute(" m")),
+    EZ_MEMBER_PROPERTY("OcclusionThreshold", m_fOcclusionThreshold)->AddAttributes(new ezDefaultValueAttribute(0.5f), new ezClampValueAttribute(0.0f, 1.0f)),
+    EZ_MEMBER_PROPERTY("OcclusionCollisionLayer", m_uiOcclusionCollisionLayer)->AddAttributes(new ezDynamicEnumAttribute("PhysicsCollisionLayer")),
     EZ_ENUM_MEMBER_PROPERTY("OnFinishedAction", ezOnComponentFinishedAction2, m_OnFinishedAction),
   }
   EZ_END_PROPERTIES;
@@ -98,6 +112,7 @@ EZ_BEGIN_COMPONENT_TYPE(ezMiniAudioSoundComponent, 1, ezComponentMode::Static)
   EZ_BEGIN_ATTRIBUTES
   {
     new ezCategoryAttribute("Sound/MiniAudio"),
+    new ezMiniAudioOcclusionManipulatorAttribute(),
   }
   EZ_END_ATTRIBUTES;
 }
@@ -125,6 +140,11 @@ void ezMiniAudioSoundComponent::SerializeComponent(ezWorldWriter& inout_stream) 
 
   ezOnComponentFinishedAction2::StorageType type = m_OnFinishedAction;
   s << type;
+  s.WriteArray(m_Effects).IgnoreResult();
+  s << m_sGroup;
+  s << m_bUseOcclusion << m_fOcclusionThreshold << m_uiOcclusionCollisionLayer;
+  s << GetNoGlobalPitch();
+  s << m_fOcclusionRadius << m_fOcclusionRange;
 }
 
 void ezMiniAudioSoundComponent::DeserializeComponent(ezWorldReader& inout_stream)
@@ -142,6 +162,24 @@ void ezMiniAudioSoundComponent::DeserializeComponent(ezWorldReader& inout_stream
   ezOnComponentFinishedAction2::StorageType type;
   s >> type;
   m_OnFinishedAction = (ezOnComponentFinishedAction2::Enum)type;
+  if (uiVersion >= 2)
+    s.ReadArray(m_Effects).IgnoreResult();
+  if (uiVersion == 3)
+  {
+    ezTagSet legacyTags;
+    legacyTags.Load(s, ezTagRegistry::GetGlobalRegistry());
+  }
+  if (uiVersion >= 4)
+    s >> m_sGroup;
+  if (uiVersion >= 5)
+  {
+    s >> m_bUseOcclusion >> m_fOcclusionThreshold >> m_uiOcclusionCollisionLayer;
+    bool bNoGlobalPitch;
+    s >> bNoGlobalPitch;
+    SetNoGlobalPitch(bNoGlobalPitch);
+  }
+  if (uiVersion >= 6)
+    s >> m_fOcclusionRadius >> m_fOcclusionRange;
 }
 
 void ezMiniAudioSoundComponent::SetPaused(bool b)
@@ -220,6 +258,8 @@ void ezMiniAudioSoundComponent::Play()
 
     ezRandom& rng = GetWorld()->GetRandomNumberGenerator();
     m_pInstance = pResource->InstantiateSound(&rng, GetWorld(), GetHandle());
+    if (m_pInstance == nullptr)
+      return;
 
     m_fResourceVolume = pResource->GetVolume(rng);
     m_fResourcePitch = pResource->GetPitch(rng);
@@ -227,6 +267,8 @@ void ezMiniAudioSoundComponent::Play()
     Update();
   }
 
+  if (m_pInstance->m_pEffectNode)
+    ma_node_set_state(&m_pInstance->m_pEffectNode->m_Node, ma_node_state_started);
   EZ_MA_CHECK(ma_sound_start(&m_pInstance->m_Sound));
   m_bPaused = false;
 }
@@ -236,6 +278,8 @@ void ezMiniAudioSoundComponent::Pause()
   if (m_pInstance)
   {
     EZ_MA_CHECK(ma_sound_stop(&m_pInstance->m_Sound));
+    if (m_pInstance->m_pEffectNode)
+      ma_node_set_state(&m_pInstance->m_pEffectNode->m_Node, ma_node_state_stopped);
   }
 }
 
@@ -269,7 +313,11 @@ void ezMiniAudioSoundComponent::StartOneShot()
     return;
 
   ezRandom& rng = GetWorld()->GetRandomNumberGenerator();
-  auto pInstance = pResource->InstantiateSound(&rng, GetWorld(), {});
+  auto pInstance = pResource->InstantiateSound(&rng, GetWorld(), GetHandle());
+  if (pInstance == nullptr)
+    return;
+  // Retain source identity for effects, but do not notify this component when a detached sound ends.
+  pInstance->m_hComponent.Invalidate();
 
   const float fResourceVolume = pResource->GetVolume(rng);
   const float fResourcePitch = pResource->GetPitch(rng);
@@ -295,18 +343,13 @@ void ezMiniAudioSoundComponent::Update()
 
 void ezMiniAudioSoundComponent::UpdateParameters(ezMiniAudioSoundInstance* pInstance, float fVolume, float fPitch) const
 {
-  const ezVec3 pos = GetOwner()->GetGlobalPosition();
+  const ezVec3 pos = GetSourcePosition();
 
   ma_sound_set_position(&pInstance->m_Sound, pos.x, pos.y, pos.z);
 
-  if (GetNoGlobalPitch())
-  {
-    ma_sound_set_pitch(&pInstance->m_Sound, fPitch);
-  }
-  else
-  {
-    ma_sound_set_pitch(&pInstance->m_Sound, fPitch * (float)GetWorld()->GetClock().GetSpeed());
-  }
+  pInstance->m_fBasePitch = GetNoGlobalPitch() ? fPitch : fPitch * static_cast<float>(GetWorld()->GetClock().GetSpeed());
+  ma_sound_set_pitch(&pInstance->m_Sound, ezMath::Clamp(pInstance->m_fBasePitch * pInstance->m_fEffectPitch, 0.01f, 100.0f));
+  pInstance->m_Effects = m_Effects;
 
   ma_sound_set_volume(&pInstance->m_Sound, fVolume);
 
@@ -330,4 +373,127 @@ void ezMiniAudioSoundComponent::SoundFinished()
   {
     Play();
   }
+}
+
+ezVec3 ezMiniAudioSoundComponent::GetSourcePosition() const
+{
+  return GetOwner()->GetGlobalPosition();
+}
+
+float ezMiniAudioSoundComponent::GetOcclusion(const ezVec3& vListener) const
+{
+  return GetOcclusion(vListener, GetSourcePosition());
+}
+
+float ezMiniAudioSoundComponent::GetOcclusion(const ezVec3& vListener, const ezVec3& vSource) const
+{
+  const float fRange = ezMath::IsFinite(m_fOcclusionRange) ? ezMath::Max(0.0f, m_fOcclusionRange) : 50.0f;
+  const float fRadius = ezMath::IsFinite(m_fOcclusionRadius) ? ezMath::Max(0.0f, m_fOcclusionRadius) : 1.0f;
+  const float fDistance = (vSource - vListener).GetLength();
+  const auto* pPhysics = GetWorld()->GetModuleReadOnly<ezPhysicsWorldModuleInterface>();
+  if (!m_bUseOcclusion || m_fOcclusionThreshold >= 1.0f || pPhysics == nullptr || !vSource.IsValid() || !vListener.IsValid() ||
+      !ezMath::IsFinite(fDistance) || fDistance <= ezMath::Max(0.02f, fRadius) || fDistance >= fRange)
+  {
+    m_fOcclusion = 0;
+    m_fSmoothedOcclusion = 0;
+    m_LastOcclusionSmoothing = ezTime::MakeFromSeconds(-1);
+    m_LastOcclusionQuery = ezTime::MakeFromSeconds(-1);
+    return 0;
+  }
+
+  const ezTime now = GetWorld()->GetClock().GetAccumulatedTime();
+  const float fMovementTolerance = ezMath::Max(0.05f, ezMath::Min(fRadius * 0.25f, 0.25f));
+  const bool bMoved = !vSource.IsEqual(m_vLastOcclusionSource, fMovementTolerance) || !vListener.IsEqual(m_vLastOcclusionListener, fMovementTolerance);
+  const bool bResetSmoothing = m_LastOcclusionSmoothing.IsNegative() || now < m_LastOcclusionSmoothing ||
+                               m_uiLastOcclusionLayer != m_uiOcclusionCollisionLayer || m_fLastOcclusionRadius != fRadius || m_fLastOcclusionRange != fRange ||
+                               (vListener - m_vLastOcclusionListener).GetLength() > ezMath::Max(5.0f, fRadius * 2.0f) ||
+                               (vSource - m_vLastOcclusionSource).GetLength() > ezMath::Max(5.0f, fRadius * 2.0f);
+  if (bMoved || now < m_LastOcclusionQuery || now - m_LastOcclusionQuery >= ezTime::MakeFromMilliseconds(50) ||
+      m_uiLastOcclusionLayer != m_uiOcclusionCollisionLayer || m_fLastOcclusionRadius != fRadius || m_fLastOcclusionRange != fRange)
+  {
+    m_LastOcclusionQuery = now;
+    m_uiLastOcclusionLayer = m_uiOcclusionCollisionLayer;
+    m_fLastOcclusionRadius = fRadius;
+    m_fLastOcclusionRange = fRange;
+    m_vLastOcclusionSource = vSource;
+    m_vLastOcclusionListener = vListener;
+    const ezVec3 vToListener = (vListener - vSource) / fDistance;
+    // World-anchored Fibonacci sphere: camera rotation cannot rotate a regular ray
+    // pattern over a grille. Only the facing hemisphere contributes, with weights
+    // tending to zero at its silhouette rather than abruptly adding/removing rays.
+    const ezUInt32 uiSampleCount = fRadius > 0 ? 32 : 1;
+    ezPhysicsQueryParameters query(m_uiOcclusionCollisionLayer);
+    query.m_bIgnoreInitialOverlap = true;
+    query.m_ShapeTypes = ezPhysicsShapeType::Static | ezPhysicsShapeType::Dynamic;
+    float fBlockedWeight = 0, fTotalWeight = 0;
+    for (ezUInt32 i = 0; i < uiSampleCount; ++i)
+    {
+      ezVec3 vSample = ezVec3::MakeZero();
+      float fWeight = 1;
+      if (fRadius > 0)
+      {
+        const float z = 1.0f - 2.0f * (static_cast<float>(i) + 0.5f) / uiSampleCount;
+        const float r = ezMath::Sqrt(ezMath::Max(0.0f, 1.0f - z * z));
+        const ezAngle angle = ezAngle::MakeFromRadian(static_cast<float>(i) * 2.39996323f);
+        vSample = ezVec3(r * ezMath::Cos(angle), r * ezMath::Sin(angle), z);
+        fWeight = ezMath::Max(0.0f, vSample.Dot(vToListener));
+        if (fWeight <= 0)
+          continue;
+      }
+      fTotalWeight += fWeight;
+      const ezVec3 vEnd = vSource + vSample * fRadius;
+      // A small listener aperture also avoids concentrating all rays on one pole
+      // next to the listener. It is independent of the authored source radius.
+      const ezVec3 vLateral = vSample - vToListener * vSample.Dot(vToListener);
+      const ezVec3 vStart = vListener + vLateral * ezMath::Min(0.2f, fRadius);
+      ezVec3 vDirection = vEnd - vStart;
+      const float fRayLength = vDirection.GetLengthAndNormalize();
+      ezPhysicsCastResultArray hits;
+      if (!pPhysics->RaycastAll(hits, vStart, vDirection, fRayLength, query))
+        continue;
+      for (const auto& hit : hits.m_Results)
+      {
+        // Only finite hits strictly between the sampled endpoints can block sound.
+        if (!ezMath::IsFinite(hit.m_fDistance) || hit.m_fDistance <= 0.001f || hit.m_fDistance >= fRayLength - 0.001f)
+          continue;
+        bool bOwnCollider = false;
+        for (const ezGameObject* pObject = GetOwner(); pObject != nullptr; pObject = pObject->GetParent())
+        {
+          if (hit.m_hActorObject == pObject->GetHandle() || hit.m_hShapeObject == pObject->GetHandle())
+          {
+            bOwnCollider = true;
+            break;
+          }
+        }
+        if (!bOwnCollider)
+        {
+          fBlockedWeight += fWeight;
+          break;
+        }
+      }
+    }
+    const float fMeasuredOcclusion = fTotalWeight > 0 ? fBlockedWeight / fTotalWeight : 0;
+    // A small dead band suppresses near-identical coverage changes at grille edges.
+    if (bResetSmoothing || fMeasuredOcclusion == 0 || fMeasuredOcclusion == 1 || ezMath::Abs(fMeasuredOcclusion - m_fOcclusion) >= 0.04f)
+      m_fOcclusion = fMeasuredOcclusion;
+  }
+  const float fThreshold = ezMath::IsFinite(m_fOcclusionThreshold) ? ezMath::Saturate(m_fOcclusionThreshold) : 0.5f;
+  const float fOcclusion = fThreshold < 1 ? ezMath::Saturate((m_fOcclusion - fThreshold) / (1 - fThreshold)) : 0.0f;
+  if (bResetSmoothing)
+    m_fSmoothedOcclusion = fOcclusion;
+  else
+  {
+    const double fDelta = ezMath::Max(0.0, (now - m_LastOcclusionSmoothing).GetSeconds());
+    // 90% attack in 300 ms, release in 150 ms. Updating multiple voices in one
+    // world tick does not advance the smoothing repeatedly.
+    const double fDuration = fOcclusion > m_fSmoothedOcclusion ? 0.3 : 0.15;
+    const float fFactor = static_cast<float>(1.0 - ezMath::Pow(10.0, -fDelta / fDuration));
+    m_fSmoothedOcclusion = ezMath::Lerp(m_fSmoothedOcclusion, fOcclusion, fFactor);
+  }
+  m_LastOcclusionSmoothing = now;
+  // The entire source sphere is guaranteed clear. Outside it, blend occlusion in
+  // over one radius so crossing the surface cannot suddenly muffle the source.
+  const float t = fRadius > 0 ? ezMath::Saturate((fDistance - fRadius) / fRadius) : 1;
+  const float fNearWeight = t * t * (3 - 2 * t);
+  return m_fSmoothedOcclusion * fNearWeight * ezMath::Saturate((fRange - fDistance) / (fRange * 0.2f));
 }

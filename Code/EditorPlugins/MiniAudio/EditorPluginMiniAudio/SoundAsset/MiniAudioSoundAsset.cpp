@@ -6,15 +6,17 @@
 #include <ToolsFoundation/Object/ObjectCommandAccessor.h>
 
 // clang-format off
-EZ_BEGIN_DYNAMIC_REFLECTED_TYPE(ezMiniAudioSoundAssetDocument, 1, ezRTTINoAllocator)
+EZ_BEGIN_DYNAMIC_REFLECTED_TYPE(ezMiniAudioSoundAssetDocument, 2, ezRTTINoAllocator)
 EZ_END_DYNAMIC_REFLECTED_TYPE;
 
-EZ_BEGIN_DYNAMIC_REFLECTED_TYPE(ezMiniAudioSoundAssetProperties, 1, ezRTTIDefaultAllocator<ezMiniAudioSoundAssetProperties>)
+EZ_BEGIN_DYNAMIC_REFLECTED_TYPE(ezMiniAudioSoundAssetProperties, 2, ezRTTIDefaultAllocator<ezMiniAudioSoundAssetProperties>)
 {
   EZ_BEGIN_PROPERTIES
   {
-    EZ_ARRAY_MEMBER_PROPERTY("Files", m_SoundFiles)->AddAttributes(new ezFileBrowserAttribute("Select Sound", "*.wav;*.mp3"), new ezRequiredAttribute()),
+    EZ_ARRAY_MEMBER_PROPERTY("Files", m_SoundFiles)->AddAttributes(new ezFileBrowserAttribute("Select Sound", "*.wav;*.mp3;*.ogg"), new ezRequiredAttribute()),
     EZ_MEMBER_PROPERTY("Group", m_sGroup)->AddAttributes(new ezDynamicStringEnumAttribute("MiniAudioSoundGroups")),
+    EZ_ARRAY_MEMBER_PROPERTY("Effects", m_Effects),
+    EZ_MEMBER_PROPERTY("RandomWithoutRepeats", m_bRandomWithoutRepeats),
     EZ_MEMBER_PROPERTY("Loop", m_bLoop),
     EZ_MEMBER_PROPERTY("MinRandomVolume", m_fMinVolume)->AddAttributes(new ezDefaultValueAttribute(1.0f), new ezClampValueAttribute(0.1f, 10.0f)),
     EZ_MEMBER_PROPERTY("MaxRandomVolume", m_fMaxVolume)->AddAttributes(new ezDefaultValueAttribute(1.0f), new ezClampValueAttribute(0.1f, 10.0f)),
@@ -55,7 +57,7 @@ ezTransformStatus ezMiniAudioSoundAssetDocument::InternalTransformAsset(ezStream
   if (pProp->m_SoundFiles.IsEmpty())
     return ezStatus("No sound files have been specified.");
 
-  const ezUInt8 uiVersion = 2;
+  const ezUInt8 uiVersion = 3;
   stream << uiVersion;
 
   stream << pProp->m_bLoop;
@@ -107,7 +109,8 @@ ezTransformStatus ezMiniAudioSoundAssetDocument::InternalTransformAsset(ezStream
   }
 
   // version 2
-  stream << pProp->m_sGroup;
+  stream << pProp->m_sGroup << pProp->m_bRandomWithoutRepeats;
+  stream.WriteArray(pProp->m_Effects).IgnoreResult();
 
   return ezStatus(EZ_SUCCESS);
 }
@@ -136,6 +139,7 @@ ezMiniAudioSoundAssetDocumentGenerator::ezMiniAudioSoundAssetDocumentGenerator()
 {
   AddSupportedFileType("wav");
   AddSupportedFileType("mp3");
+  AddSupportedFileType("ogg");
 }
 
 ezMiniAudioSoundAssetDocumentGenerator::~ezMiniAudioSoundAssetDocumentGenerator() = default;
