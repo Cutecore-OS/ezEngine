@@ -18,8 +18,16 @@ namespace ezRmlUiInternal
   {
     ezStringView sTrimmedInput = ezRmlUiConversionUtils::ToStringView(sInput);
     sTrimmedInput.Trim(" \t\r\n");
-    if (sTrimmedInput.IsEmpty() == false)
+
+    // Never translate data bindings
+    if (sTrimmedInput.IsEmpty() == false && sTrimmedInput.StartsWith("{{") == false)
     {
+      // Silence the translator log missing messages for this, as RmlUi will call this function for basically all strings
+      // and we don't want to spam the log with missing translations.
+      const bool bTemp = ezTranslatorLogMissing::s_bActive;
+      ezTranslatorLogMissing::s_bActive = false;
+      EZ_SCOPE_EXIT(ezTranslatorLogMissing::s_bActive = bTemp;);
+
       ezStringView sTranslated = ezTranslate(sTrimmedInput);
       if (sTranslated != sTrimmedInput)
       {
@@ -44,13 +52,26 @@ namespace ezRmlUiInternal
     Rml::SystemInterface::JoinPath(out_sTranslatedPath, sDocumentPath, sPath);
   }
 
+  bool SystemInterface::s_bAllowMissingDataModels = false;
+
   bool SystemInterface::LogMessage(Rml::Log::Type type, const Rml::String& sMessage)
   {
     switch (type)
     {
       case Rml::Log::LT_ERROR:
-        ezLog::Error("{}", ezRmlUiConversionUtils::ToStringView(sMessage));
+      {
+        const ezStringView sText = ezRmlUiConversionUtils::ToStringView(sMessage);
+
+        if (s_bAllowMissingDataModels && sText.StartsWith("Could not locate data model"))
+        {
+          ezLog::Debug("{}", sText);
+        }
+        else
+        {
+          ezLog::Error("{}", sText);
+        }
         break;
+      }
 
       case Rml::Log::LT_ASSERT:
         ezLog::Error("{}", ezRmlUiConversionUtils::ToStringView(sMessage));

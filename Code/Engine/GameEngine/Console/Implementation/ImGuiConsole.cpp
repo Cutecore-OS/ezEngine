@@ -832,6 +832,8 @@ void ezImGuiConsole::RenderCVarValue(ezCVar* pCVar)
   if (!pCVar)
     return;
 
+  const ImGuiInputTextFlags inputFlags = ImGuiInputTextFlags_EnterReturnsTrue;
+
   // Render different input widgets based on CVar type
   switch (pCVar->GetType())
   {
@@ -853,7 +855,7 @@ void ezImGuiConsole::RenderCVarValue(ezCVar* pCVar)
       int value = pIntVar->GetValue();
       ezStringBuilder sId, sNameTemp;
       sId.SetFormat("##int_{}", pCVar->GetName().GetData(sNameTemp));
-      if (ImGui::InputInt(sId.GetData(), &value))
+      if (ImGui::InputInt(sId.GetData(), &value, 1, 100, inputFlags))
       {
         *pIntVar = value;
       }
@@ -865,7 +867,7 @@ void ezImGuiConsole::RenderCVarValue(ezCVar* pCVar)
       float value = pFloatVar->GetValue();
       ezStringBuilder sId, sNameTemp;
       sId.SetFormat("##float_{}", pCVar->GetName().GetData(sNameTemp));
-      if (ImGui::InputFloat(sId.GetData(), &value))
+      if (ImGui::InputFloat(sId.GetData(), &value, 0.0f, 0.0f, "%.3f", inputFlags))
       {
         *pFloatVar = value;
       }
@@ -879,7 +881,7 @@ void ezImGuiConsole::RenderCVarValue(ezCVar* pCVar)
       ezStringUtils::Copy(buffer, sizeof(buffer), value.GetData());
       ezStringBuilder sId, sNameTemp;
       sId.SetFormat("##string_{}", pCVar->GetName().GetData(sNameTemp));
-      if (ImGui::InputText(sId.GetData(), buffer, sizeof(buffer)))
+      if (ImGui::InputText(sId.GetData(), buffer, sizeof(buffer), inputFlags))
       {
         *pStringVar = buffer;
       }
@@ -1207,6 +1209,26 @@ void ezImGuiConsole::RenderConsole(bool bIsOpen)
       return;
 
     ezImgui::GetSingleton()->SetCurrentContextForView(pView->GetHandle());
+
+    // The window positions and sizes are derived from the display size, but ImGui applies them only once and
+    // then keeps whatever the user dragged them to. After the resolution or the DPI scaling changed, the layout
+    // has to be computed again, otherwise the windows overlap or end up outside of the screen.
+    const ImGuiIO& io = ImGui::GetIO();
+
+    if (m_vLayoutDisplaySize.x != io.DisplaySize.x || m_vLayoutDisplaySize.y != io.DisplaySize.y || m_fLayoutScale != io.FontGlobalScale)
+    {
+      // the first time nothing has been laid out yet, forcing a reset would throw away what LoadState() restored
+      const bool bHadLayout = (m_fLayoutScale != 0.0f);
+
+      m_vLayoutDisplaySize.Set(io.DisplaySize.x, io.DisplaySize.y);
+      m_fLayoutScale = io.FontGlobalScale;
+
+      if (bHadLayout)
+      {
+        // stays set for a few frames, so that windows which are not rendered right now also pick it up
+        m_uiResetLayout = 3;
+      }
+    }
   }
 
   if (bIsOpen)

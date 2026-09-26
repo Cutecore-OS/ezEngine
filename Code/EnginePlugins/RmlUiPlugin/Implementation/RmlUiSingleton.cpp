@@ -163,7 +163,7 @@ ezRmlUi::ezRmlUi()
 
   if (m_pData->m_Config.Load().Failed())
   {
-    ezLog::Warning("No valid RmlUi configuration file available in '{}'.", ezRmlUiConfiguration::s_sConfigFile);
+    ezLog::Warning("No valid RmlUi configuration file available in '{}'.", ezRmlUiConfiguration::s_sConfigFileLoad);
     return;
   }
 
@@ -263,6 +263,10 @@ ezResult ezRmlUi::LoadDocumentFromResource(ezRmlUiContext& ref_context, const ez
       // RmlUi is not thread safe, so we need to make that we only load/unload one document at a time.
       EZ_LOCK(m_pData->m_ContextsMutex);
 
+      const bool bAllowMissingDataModels = ezRmlUiInternal::SystemInterface::s_bAllowMissingDataModels;
+      ezRmlUiInternal::SystemInterface::s_bAllowMissingDataModels = true;
+      EZ_SCOPE_EXIT(ezRmlUiInternal::SystemInterface::s_bAllowMissingDataModels = bAllowMissingDataModels;);
+
       ref_context.LoadDocument(pResource->GetRmlFile().GetData());
     }
   }
@@ -287,6 +291,10 @@ ezResult ezRmlUi::LoadDocumentFromString(ezRmlUiContext& ref_context, const ezSt
 
     // RmlUi is not thread safe, so we need to make that we only load/unload one document at a time.
     EZ_LOCK(m_pData->m_ContextsMutex);
+
+    const bool bAllowMissingDataModels = ezRmlUiInternal::SystemInterface::s_bAllowMissingDataModels;
+    ezRmlUiInternal::SystemInterface::s_bAllowMissingDataModels = true;
+    EZ_SCOPE_EXIT(ezRmlUiInternal::SystemInterface::s_bAllowMissingDataModels = bAllowMissingDataModels;);
 
     ref_context.LoadDocumentFromMemory(sRmlContent);
   }

@@ -22,7 +22,6 @@
 #include <RendererCore/Pipeline/RenderPipelineResource.h>
 #include <RendererCore/Pipeline/View.h>
 #include <RendererCore/RenderWorld/RenderWorld.h>
-#include <RendererCore/Utils/CoreRenderProfile.h>
 #include <RendererFoundation/Device/Device.h>
 #include <RendererFoundation/Device/SwapChain.h>
 
@@ -90,6 +89,9 @@ void ezGameState::OnDeactivation()
   }
 
   ezRenderWorld::DeleteView(m_hMainView);
+
+  m_hMainWindow.Invalidate();
+  m_pMainWindow = nullptr;
 
   s_pActiveGameState = nullptr;
 }
@@ -204,9 +206,20 @@ ezRegisteredWndHandle ezGameState::CreateXRWindow()
     SetupMainView({}, {});
   }
 
+  // the XR window takes ownership of the companion window, which lives as long as the XR window is registered
+  ezWindow* pCompanionWindow = pMainWindow.Borrow();
+
   ezView* pView = nullptr;
   EZ_VERIFY(ezRenderWorld::TryGetView(m_hMainView, pView), "");
-  return pXRInterface->CreateXRWindow(pView, ezGALMSAASampleCount::Default, std::move(pMainWindow), std::move(pOutput));
+  ezRegisteredWndHandle hWindow = pXRInterface->CreateXRWindow(pView, ezGALMSAASampleCount::Default, std::move(pMainWindow), std::move(pOutput));
+
+  if (!hWindow.IsInvalidated())
+  {
+    m_hMainWindow = hWindow;
+    m_pMainWindow = pCompanionWindow;
+  }
+
+  return hWindow;
 }
 
 void ezGameState::CreateWindows()
@@ -225,9 +238,24 @@ void ezGameState::CreateWindows()
 
 
   // Default flat window
+  m_pMainWindow = pMainWindow.Borrow();
+
   auto pWinMan = ezWindowManager::GetSingleton();
   ezRegisteredWndHandle id = pWinMan->Register("Game", this, std::move(pMainWindow));
   pWinMan->SetOutputTarget(id, std::move(pOutput));
+
+  m_hMainWindow = id;
+}
+
+ezWindow* ezGameState::GetMainWindow() const
+{
+  // the window manager owns the window and may have closed it already
+  auto pWinMan = ezWindowManager::GetSingleton();
+
+  if (m_pMainWindow == nullptr || pWinMan == nullptr || !pWinMan->IsValid(m_hMainWindow))
+    return nullptr;
+
+  return m_pMainWindow;
 }
 
 void ezGameState::ConfigureMainWindowInputDevices(ezWindow* pWindow) {}
@@ -460,13 +488,10 @@ ezUniquePtr<ezWindow> ezGameState::CreateMainWindow()
 
   if (sWndCfg.IsEmpty())
   {
-    const ezStringView sCfgAppData = ":appdata/RuntimeConfigs/Window.ddl";
-    const ezStringView sCfgProject = ":project/RuntimeConfigs/Window.ddl";
-
-    if (ezFileSystem::ExistsFile(sCfgAppData))
-      sWndCfg = sCfgAppData;
+    if (ezFileSystem::ExistsFile(s_sUserWindowConfigFile))
+      sWndCfg = s_sUserWindowConfigFile;
     else
-      sWndCfg = sCfgProject;
+      sWndCfg = s_sWindowConfigFile;
   }
 
   ezWindowCreationDesc wndDesc;
@@ -477,6 +502,9 @@ ezUniquePtr<ezWindow> ezGameState::CreateMainWindow()
   pWindow->Initialize(wndDesc).AssertSuccess("Window creation failed");
 
   pWindow->WindowEvents().AddEventHandler(ezMakeDelegate(&ezGameState::OnWindowEvent, this));
+
+  // debug text is specified in pixels, so it has to follow the scaling of the display
+  ezRenderWorld::SetDisplayScale(pWindow->GetContentScaleFactor());
 
   if (auto pInput = ezDynamicCast<ezInputDeviceMouseKeyboard*>(pWindow->GetInputDevice()))
   {
@@ -626,5 +654,9 @@ void ezGameState::OnWindowEvent(const ezWindowEvent& e)
   {
     // forward the close button click to the game state
     RequestQuit("window");
+  }
+  else if (e.m_Type == ezWindowEvent::Type::ContentScaleChanged)
+  {
+    ezRenderWorld::SetDisplayScale(e.m_pWindow->GetContentScaleFactor());
   }
 }

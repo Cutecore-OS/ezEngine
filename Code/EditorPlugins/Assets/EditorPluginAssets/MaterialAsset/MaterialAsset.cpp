@@ -216,7 +216,7 @@ EZ_BEGIN_DYNAMIC_REFLECTED_TYPE(ezMaterialAssetProperties, 4, ezRTTIDefaultAlloc
 }
 EZ_END_DYNAMIC_REFLECTED_TYPE;
 
-EZ_BEGIN_DYNAMIC_REFLECTED_TYPE(ezMaterialAssetDocument, 12, ezRTTINoAllocator)
+EZ_BEGIN_DYNAMIC_REFLECTED_TYPE(ezMaterialAssetDocument, 13, ezRTTINoAllocator)
 EZ_END_DYNAMIC_REFLECTED_TYPE;
 // clang-format on
 
@@ -872,7 +872,11 @@ ezTransformStatus ezMaterialAssetDocument::InternalTransformAsset(const char* sz
           arguments << QString::fromUtf8(sAutoGenShader.GetData());
 
           arguments << "-platform";
+#if defined(BUILDSYSTEM_ENABLE_VULKAN_SUPPORT)
+          arguments << "VULKAN"; /// \todo Rendering platform is currently hardcoded
+#else
           arguments << "DX11_SM50"; /// \todo Rendering platform is currently hardcoded
+#endif
 
           // determine the permutation variables that should get fixed values
           {
